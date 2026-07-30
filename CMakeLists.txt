@@ -188,6 +188,18 @@ if(PKHUB_BUILD_TESTS)
     )
     target_include_directories(pkhub_gba_roundtrip PRIVATE ${CMAKE_SOURCE_DIR}/include)
     add_test(NAME gba_roundtrip COMMAND pkhub_gba_roundtrip)
+
+    add_executable(pkhub_gba_writeback tests/gba_writeback_test.cpp
+        source/backends/raw/gba/GbaGen3.cpp
+        source/backends/raw/RawSaveBackend.cpp
+        source/core/pokemon/GameId.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/save/Box.cpp
+        source/core/fs/Paths.cpp
+    )
+    target_include_directories(pkhub_gba_writeback PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_options(pkhub_gba_writeback PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME gba_writeback COMMAND pkhub_gba_writeback)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | BorealisUI: ${ENABLE_BOREALIS_UI} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

@@ -87,8 +87,23 @@ SaveOpenStatus RawSaveBackend::commit() {
         return {SaveOpenResult::NotFound, "Not open"};
     }
     if (format_ == RawSaveFormat::GbaSav) {
-        // TODO(phase1): write party + PC back into sectioned buffer (re-checksum sections).
-        return {SaveOpenResult::IoError, "GBA write-back not yet implemented"};
+        std::string err;
+        if (!gba::writeSave(raw_, game_, party_, boxes_, &err)) {
+            return {SaveOpenResult::IoError,
+                    err.empty() ? "GBA write-back failed" : err};
+        }
+        const std::string resolved = fs::resolvePath(path_);
+        std::ofstream out(resolved, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            return {SaveOpenResult::IoError, "Cannot write " + resolved};
+        }
+        out.write(reinterpret_cast<const char*>(raw_.data()),
+                  static_cast<std::streamsize>(raw_.size()));
+        if (!out) {
+            return {SaveOpenResult::IoError, "Failed writing " + resolved};
+        }
+        dirty_ = false;
+        return {SaveOpenResult::Ok, "GBA save written"};
     }
     // TODO(phase1): write raw_ back to path_ for other formats
     dirty_ = false;

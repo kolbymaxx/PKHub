@@ -1,5 +1,8 @@
 #include "pkhub/backends/RawSaveBackend.hpp"
 
+#include "pkhub/backends/raw/GbaGen3.hpp"
+#include "pkhub/core/fs/Paths.hpp"
+
 #include <fstream>
 #include <iterator>
 #include <string>
@@ -9,15 +12,14 @@ namespace pkhub {
 RawSaveBackend::RawSaveBackend(std::string path) : path_(std::move(path)) {}
 
 RawSaveFormat detectRawFormat(const std::string& path, const std::vector<uint8_t>& data) {
-    (void)data;
     const auto dot = path.find_last_of('.');
     if (dot == std::string::npos) {
         return RawSaveFormat::Unknown;
     }
     const auto ext = path.substr(dot + 1);
     if (ext == "sav" || ext == "srm") {
-        // Size-based GBA vs NDS refinement comes in Phase 1.
-        if (data.size() == 0x20000 || data.size() == 0x20010) {
+        // GBA: 128KB, optionally with RTC footer (0x20000+).
+        if (data.size() >= 0x20000 && data.size() <= 0x20000 + 0x100) {
             return RawSaveFormat::GbaSav;
         }
         return RawSaveFormat::NdsSav;
@@ -29,9 +31,10 @@ RawSaveFormat detectRawFormat(const std::string& path, const std::vector<uint8_t
 }
 
 SaveOpenStatus RawSaveBackend::open() {
-    std::ifstream in(path_, std::ios::binary);
+    const std::string resolved = fs::resolvePath(path_);
+    std::ifstream in(resolved, std::ios::binary);
     if (!in) {
-        return {SaveOpenResult::NotFound, "Cannot open " + path_};
+        return {SaveOpenResult::NotFound, "Cannot open " + resolved};
     }
     raw_.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
     format_ = detectRawFormat(path_, raw_);
@@ -39,21 +42,37 @@ SaveOpenStatus RawSaveBackend::open() {
         return {SaveOpenResult::Unsupported, "Unrecognized save format"};
     }
 
-    // Skeleton empty boxes — parsers fill later.
-    const std::size_t boxCount = (format_ == RawSaveFormat::GbaSav) ? 14 : 24;
+    if (format_ == RawSaveFormat::GbaSav) {
+        const auto parsed = gba::parseSave(raw_);
+        if (!parsed.ok) {
+            return {SaveOpenResult::Corrupt, parsed.message};
+        }
+        game_ = parsed.game;
+        party_ = parsed.party;
+        boxes_ = parsed.boxes;
+        open_ = true;
+        dirty_ = false;
+        return {SaveOpenResult::Ok, parsed.message};
+    }
+
+    // Other formats: skeleton empty boxes until their parsers land.
+    const std::size_t boxCount = 24;
     boxes_.assign(boxCount, Box{kDefaultBoxSlots});
     for (std::size_t i = 0; i < boxes_.size(); ++i) {
         boxes_[i].setName("Box " + std::to_string(i + 1));
     }
     party_ = Party{};
+    game_ = GameId::Unknown;
     open_ = true;
     dirty_ = false;
-    return {SaveOpenResult::Ok, "RawSaveBackend skeleton open"};
+    return {SaveOpenResult::Ok, "RawSaveBackend open (parser pending for this format)"};
 }
 
 void RawSaveBackend::close() {
     raw_.clear();
     boxes_.clear();
+    party_ = Party{};
+    game_ = GameId::Unknown;
     open_ = false;
     dirty_ = false;
 }
@@ -67,7 +86,11 @@ SaveOpenStatus RawSaveBackend::commit() {
     if (!open_) {
         return {SaveOpenResult::NotFound, "Not open"};
     }
-    // TODO(phase1): write raw_ back to path_
+    if (format_ == RawSaveFormat::GbaSav) {
+        // TODO(phase1): write party + PC back into sectioned buffer (re-checksum sections).
+        return {SaveOpenResult::IoError, "GBA write-back not yet implemented"};
+    }
+    // TODO(phase1): write raw_ back to path_ for other formats
     dirty_ = false;
     return {SaveOpenResult::Ok, "RawSaveBackend commit stub"};
 }

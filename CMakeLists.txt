@@ -24,6 +24,7 @@ set(PKHUB_SOURCES
     source/core/save/Box.cpp
     source/core/save/SaveSession.cpp
     source/core/hub/HubStorage.cpp
+    source/core/hub/HubPokemonCodec.cpp
     source/core/backup/BackupService.cpp
     source/core/safety/LegalityService.cpp
     source/core/safety/SafetyPolicy.cpp
@@ -32,6 +33,7 @@ set(PKHUB_SOURCES
     source/backends/switch/SwitchSaveBackend.cpp
     source/backends/switch/UnsupportedSaveBackend.cpp
     source/backends/raw/RawSaveBackend.cpp
+    source/backends/raw/gba/GbaGen3.cpp
     source/backends/discovery/SaveDiscovery.cpp
     source/platform/SaveAccess.cpp
     source/ui/UiBootstrap.cpp
@@ -61,6 +63,7 @@ add_executable(PKHub ${PKHUB_SOURCES})
 
 target_include_directories(PKHub PRIVATE
     ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/libs/json
 )
 
 target_compile_options(PKHub PRIVATE
@@ -160,14 +163,44 @@ if(PKHUB_BUILD_TESTS)
         source/core/pokemon/Pokemon.cpp
         source/core/save/Box.cpp
         source/core/hub/HubStorage.cpp
+        source/core/hub/HubPokemonCodec.cpp
+        source/core/fs/Paths.cpp
         source/core/safety/LegalityService.cpp
         source/core/safety/SafetyPolicy.cpp
         source/services/TransferService.cpp
         source/backends/switch/UnsupportedSaveBackend.cpp
         source/ui/SpritePlaceholder.cpp
     )
-    target_include_directories(pkhub_smoke PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(pkhub_smoke PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/libs/json
+    )
+    target_compile_options(pkhub_smoke PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME smoke COMMAND pkhub_smoke)
+
+    add_executable(pkhub_hub_persist tests/hub_persist_test.cpp
+        source/core/pokemon/GameId.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/save/Box.cpp
+        source/core/hub/HubStorage.cpp
+        source/core/hub/HubPokemonCodec.cpp
+        source/core/fs/Paths.cpp
+    )
+    target_include_directories(pkhub_hub_persist PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/libs/json
+    )
+    target_compile_options(pkhub_hub_persist PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME hub_persist COMMAND pkhub_hub_persist)
+
+    add_executable(pkhub_gba_roundtrip tests/gba_roundtrip_test.cpp
+        source/backends/raw/gba/GbaGen3.cpp
+        source/core/pokemon/GameId.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/save/Box.cpp
+    )
+    target_include_directories(pkhub_gba_roundtrip PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    add_test(NAME gba_roundtrip COMMAND pkhub_gba_roundtrip)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | Borealis: ${HAVE_BOREALIS} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

@@ -1,5 +1,7 @@
 #include "pkhub/core/fs/Paths.hpp"
 
+#include <cstdlib>
+#include <cstring>
 #include <string>
 
 #if defined(__SWITCH__)
@@ -10,21 +12,55 @@
 #endif
 
 namespace pkhub::fs {
+namespace {
+
+#if !defined(__SWITCH__)
+std::string hostDataRoot() {
+    if (const char* env = std::getenv("PKHUB_DATA_ROOT")) {
+        if (env[0] != '\0') {
+            std::string root = env;
+            while (!root.empty() && (root.back() == '/' || root.back() == '\\')) {
+                root.pop_back();
+            }
+            return root;
+        }
+    }
+    return "./pkhub_data";
+}
+
+constexpr const char* kSdmcPrefix = "sdmc:/switch/PKHub";
+#endif
+
+}  // namespace
+
+std::string resolvePath(const std::string& p) {
+#if defined(__SWITCH__)
+    return p;
+#else
+    // Map sdmc:/switch/PKHub/... → $PKHUB_DATA_ROOT/... or ./pkhub_data/...
+    if (p.rfind(kSdmcPrefix, 0) == 0) {
+        const std::string rest = p.substr(std::strlen(kSdmcPrefix));
+        return hostDataRoot() + rest;
+    }
+    return p;
+#endif
+}
 
 bool createDirectories(const std::string& path) {
 #if defined(_WIN32)
     (void)path;
     return false;
 #else
-    // Minimal mkdir -p style for sdmc paths.
+    const std::string resolved = resolvePath(path);
+    // Minimal mkdir -p style.
     std::string partial;
-    for (std::size_t i = 0; i < path.size(); ++i) {
-        partial.push_back(path[i]);
-        if (path[i] == '/' || i + 1 == path.size()) {
+    for (std::size_t i = 0; i < resolved.size(); ++i) {
+        partial.push_back(resolved[i]);
+        if (resolved[i] == '/' || i + 1 == resolved.size()) {
             if (partial.size() <= 1) {
                 continue;
             }
-            // skip scheme-like "sdmc:"
+            // skip scheme-like "sdmc:" if somehow still present
             if (partial.find(':') != std::string::npos && partial.back() == ':') {
                 continue;
             }
@@ -37,7 +73,7 @@ bool createDirectories(const std::string& path) {
 
 bool fileExists(const std::string& path) {
     struct stat st {};
-    return ::stat(path.c_str(), &st) == 0;
+    return ::stat(resolvePath(path).c_str(), &st) == 0;
 }
 
 bool ensureAppDirectories() {

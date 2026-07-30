@@ -20,9 +20,17 @@ public:
     BackupResult backupBeforeWrite(ISaveBackend& backend, const std::string& label);
     BackupResult backupHub(const std::string& hubRoot, const std::string& label);
 
+    /// Copy a single file into a timestamped backup folder.
+    BackupResult backupFile(const std::string& path, const std::string& label);
+
+    /// Recursively copy a directory tree into a timestamped backup folder.
+    BackupResult backupDirectory(const std::string& path, const std::string& label);
+
     const std::string& root() const { return root_; }
 
 private:
+    std::string makeBackupDir(const std::string& category, const std::string& label) const;
+
     std::string root_;
 };
 

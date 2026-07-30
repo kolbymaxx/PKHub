@@ -1,0 +1,4 @@
+[submodule "libs/borealis"]
+	path = libs/borealis
+	url = https://github.com/XITRIX/borealis.git
+	branch = moonlight_wiliwili

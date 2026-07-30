@@ -6,9 +6,11 @@ Next-generation multi-generation Pokémon save editor and manager for Atmosphere
 
 1. **Backend-agnostic UI** — Screens talk only to `ISaveBackend` / `HubStorage`, never to game-specific formats.
 2. **Unified Pokémon model** — One editable `Pokemon` object across gens; backends serialize/deserialize.
-3. **Safety first** — Every write is preceded by an automatic backup; legality/online risk is surfaced, never silently ignored.
-4. **Offline-first** — No network required for core features; assets and data ship on-device.
-5. **Hub as a first-class save** — Hub Storage implements the same box/party abstractions as game saves.
+3. **Safety first** — Every write is preceded by an automatic backup; legality/online risk uses **soft warnings**, with **confirm dialogs only** for save-brick / extreme-risk actions (see `SafetyPolicy`).
+4. **Offline-first** — No network required for core features; Phase 1 uses sprite placeholders.
+5. **Hub as a first-class save** — Hub Storage implements the same box/party abstractions as game saves (versioned binary + JSON metadata).
+6. **Clean-room formats** — Public save structures reimplemented in C++; do not copy PKHeX/PKSM source.
+7. **Dual platforms** — Desktop Borealis for UI iteration; Switch `.nro` for device.
 
 ---
 
@@ -53,8 +55,10 @@ PKHub/
 ├── README.md
 ├── docs/
 │   ├── ARCHITECTURE.md          ← this file
+│   ├── DECISIONS.md
 │   ├── NAVIGATION.md
 │   ├── BOREALIS_SETUP.md
+│   ├── HUB_FORMAT.md
 │   └── QUESTIONS.md
 ├── include/pkhub/
 │   ├── core/
@@ -174,18 +178,20 @@ Parsers live behind `ISaveBackend` and write into the unified `Pokemon` model:
 | 5 | BW / B2W2 | Raw (NDS) | |
 | 6–7 | XY / ORAS / SM / USUM | Raw (3DS) | common Citra / checkpoint dumps |
 | 8 | SwSh / BDSP / LA | Switch | title IDs + known offsets |
-| 9 | SV (+ DLC) / ZA | Switch | |
+| 9 | SV (+ DLC) | Switch | |
+| 9 | Legends Z-A | **Stub** | `UnsupportedSaveBackend` until format documented |
 
-Phase 1 prioritizes: **SV → SwSh → GBA → Hub**, then expand.
+Phase 1 prioritizes: **SV → SwSh → GBA → Hub**, then expand. Z-A does not block Phase 1.
 
 ---
 
 ## Safety Model
 
-- **Hard rule:** never write without a successful backup attempt (configurable override with explicit warning).
-- **Online risk banner** on Switch titles that support online / HOME transfer.
-- **Legality** is advisory in Phase 1–2; Phase 3 deepens checks.
+- **Hard rule:** never write without a successful backup attempt (override requires **confirm**).
+- **Online / HOME:** soft banners and legality indicators; do not block edits.
+- **Confirm-gated:** disable backups, write without backup, delete non-empty boxes, raw/hex edits (`SafetyPolicy`).
 - **Dirty session** prompts on exit / switching games.
+- See `docs/DECISIONS.md`.
 
 ---
 

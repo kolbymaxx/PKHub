@@ -6,6 +6,7 @@
 
 #include "pkhub/core/pokemon/GameId.hpp"
 #include "pkhub/core/save/ISaveBackend.hpp"
+#include "pkhub/platform/SaveAccess.hpp"
 
 namespace pkhub {
 
@@ -16,11 +17,14 @@ struct SwitchUserId {
 
 /**
  * Official Switch title saves via libnx.
- * Skeleton — mount/parse wired in Phase 1 implementation.
+ * Prefer title-override mount; also support fsOpen_SaveData + user picker.
  */
 class SwitchSaveBackend : public ISaveBackend {
 public:
-    SwitchSaveBackend(GameId game, uint64_t titleId, SwitchUserId userId = {});
+    SwitchSaveBackend(GameId game,
+                      uint64_t titleId,
+                      SwitchUserId userId = {},
+                      SaveAccessMode accessMode = SaveAccessMode::Auto);
 
     SaveOpenStatus open() override;
     void close() override;
@@ -39,10 +43,14 @@ public:
     Party& party() override;
     const Party& party() const override;
 
+    SaveAccessMode accessMode() const { return accessMode_; }
+    void setAccessMode(SaveAccessMode mode) { accessMode_ = mode; }
+
 private:
     GameId game_;
     uint64_t titleId_;
     SwitchUserId userId_;
+    SaveAccessMode accessMode_ = SaveAccessMode::Auto;
     bool open_ = false;
     bool dirty_ = false;
     std::vector<Box> boxes_;

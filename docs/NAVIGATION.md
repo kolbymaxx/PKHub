@@ -24,14 +24,21 @@ Secondary (overflow / settings gear): Backups, Settings, About, Legality info.
 
 ---
 
+## Title override / save mount
+
+1. **Title override (preferred)** — most reliable full save access.
+2. **`fsOpen_SaveData` + user picker** — cleaner when it works without override.
+
+`SaveAccessMode::Auto` tries override context first, then FsSaveData.
+
 ## Flow A — Switch Games
 
 ```
 Home → Switch Games
-  → Game list (SV, ZA, SwSh, LA, BDSP, …)  [installed badge if detectable]
-  → User/account picker (if needed)
-  → Mount save (SwitchSaveBackend)
-  → Auto-backup prompt policy
+  → Game list (SV, SwSh, LA, BDSP, …; Z-A shown as stub)
+  → Access mode hint (title override recommended)
+  → User/account picker (when using FsSaveData)
+  → Mount save (SwitchSaveBackend)  OR  show “format not yet documented” for Z-A
   → Save Workspace (boxes / party / editor)
 ```
 
@@ -101,6 +108,7 @@ Phase 2 may allow dual-pane compare (optional).
 
 ## Safety UX placement
 
-- Banner on Switch game workspace: “Editing this save can affect online / HOME use.”
-- Modal before first write per session.
+- Soft banners for legality / HOME risk (never block edits by default).
+- Confirm modals only for brick / extreme risk (`SafetyPolicy`).
 - Backup success snackbar after save.
+- Placeholder colored slots until real sprites ship.

@@ -27,7 +27,8 @@ struct LegalityReport {
     bool hasRisk() const { return overall >= RiskLevel::Caution; }
 };
 
-/// Advisory checks only — never silently mutates Pokémon.
+/// Soft advisory checks — never silently mutates Pokémon.
+/// UI combines this with SafetyPolicy (soft warn vs confirm).
 class LegalityService {
 public:
     LegalityReport evaluate(const Pokemon& mon, GameId contextGame) const;

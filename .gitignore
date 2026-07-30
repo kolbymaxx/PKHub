@@ -1,0 +1,34 @@
+# Build
+build/
+cmake-build-*/
+out/
+*.o
+*.elf
+*.nro
+*.nacp
+*.nso
+*.npdm
+*.map
+*.lst
+
+# IDE
+.idea/
+.vscode/
+*.user
+.cache/
+compile_commands.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local secrets / dumps
+*.sav
+*.dsv
+*.srm
+*.bk*
+sdmc/
+
+# Submodule checkouts may contain build artifacts
+libs/**/build/
+libs/**/.cache/

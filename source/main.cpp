@@ -1,20 +1,22 @@
 /**
  * PKHub — Nintendo Switch Pokémon save editor / Hub manager
  *
- * Phase 0 skeleton: boots Borealis (when available) or a headless stub
- * so the project structure and CMake target are in place.
+ * Phase 0 skeleton: boots Borealis (when available) or a headless stub.
+ * Desktop Borealis target is preferred for UI iteration.
  */
 
 #include <cstdio>
 #include <memory>
 #include <string>
 
+#include "pkhub/backends/SaveDiscovery.hpp"
+#include "pkhub/backends/UnsupportedSaveBackend.hpp"
 #include "pkhub/core/backup/BackupService.hpp"
 #include "pkhub/core/fs/Paths.hpp"
 #include "pkhub/core/hub/HubStorage.hpp"
 #include "pkhub/core/pokemon/GameId.hpp"
 #include "pkhub/core/save/SaveSession.hpp"
-#include "pkhub/backends/SaveDiscovery.hpp"
+#include "pkhub/core/safety/SafetyPolicy.hpp"
 
 #if defined(PKHUB_HAS_BOREALIS)
 #include <borealis.hpp>
@@ -43,7 +45,8 @@ int runBorealisUi() {
     switchTab->addView(new brls::ListItem("Sword / Shield", "Official Switch save"));
     switchTab->addView(new brls::ListItem("Legends: Arceus", "Official Switch save"));
     switchTab->addView(new brls::ListItem("BDSP", "Official Switch save"));
-    switchTab->addView(new brls::ListItem("Legends: Z-A", "Official Switch save (TBD)"));
+    switchTab->addView(new brls::ListItem(
+        "Legends: Z-A", "Format not yet documented — stub only"));
 
     auto* emuTab = new brls::List();
     emuTab->addView(new brls::ListItem("Scan RetroArch saves", "GBA → DS → 3DS"));
@@ -81,9 +84,21 @@ int runHeadlessSmoke() {
     auto detected = pkhub::scanKnownSwitchTitles();
     std::printf("Known Switch titles listed: %zu\n", detected.size());
     for (const auto& d : detected) {
-        std::printf("  - %s (0x%016llX)\n", d.displayName.c_str(),
-                    static_cast<unsigned long long>(d.titleId));
+        std::printf("  - %s (0x%016llX)%s\n", d.displayName.c_str(),
+                    static_cast<unsigned long long>(d.titleId),
+                    d.formatSupported ? "" : " [stub: format not documented]");
     }
+
+    auto za = pkhub::makeLegendsZAStub();
+    auto zaStatus = za->open();
+    std::printf("Z-A stub: %s\n", zaStatus.message.c_str());
+
+    pkhub::SafetyPolicy safety;
+    auto soft = safety.evaluate(pkhub::SafetyAction::InjectLikelyIllegal);
+    auto hard = safety.evaluate(pkhub::SafetyAction::RawHexEdit);
+    std::printf("Safety: illegal inject=%s raw hex=%s\n",
+                soft.gate == pkhub::SafetyGate::SoftWarn ? "soft-warn" : "?",
+                hard.gate == pkhub::SafetyGate::RequireConfirm ? "confirm" : "?");
 
     std::printf("OK — skeleton ready.\n");
     return 0;
@@ -94,10 +109,6 @@ int runHeadlessSmoke() {
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
-
-#if defined(__SWITCH__)
-    // Optional: console init for early logs when not using Borealis yet.
-#endif
 
 #if defined(PKHUB_HAS_BOREALIS)
     return runBorealisUi();

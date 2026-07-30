@@ -18,6 +18,8 @@ struct DetectedSave {
     std::string displayName;
     uint64_t titleId = 0;      // Switch only
     bool isSwitchOfficial = false;
+    bool formatSupported = true;  // false → UnsupportedSaveBackend stub
+    std::string unsupportedReason;
 };
 
 class ISaveBackendFactory {

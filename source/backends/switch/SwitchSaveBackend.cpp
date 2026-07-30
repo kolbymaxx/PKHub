@@ -4,14 +4,21 @@
 
 namespace pkhub {
 
-SwitchSaveBackend::SwitchSaveBackend(GameId game, uint64_t titleId, SwitchUserId userId)
-    : game_(game), titleId_(titleId), userId_(userId) {
+SwitchSaveBackend::SwitchSaveBackend(GameId game,
+                                     uint64_t titleId,
+                                     SwitchUserId userId,
+                                     SaveAccessMode accessMode)
+    : game_(game), titleId_(titleId), userId_(userId), accessMode_(accessMode) {
     (void)userId_;
     (void)titleId_;
 }
 
 SaveOpenStatus SwitchSaveBackend::open() {
-    // TODO(phase1): fsOpen_SaveData / title override mount, then parse.
+    // Phase 1 mount order when accessMode_ == Auto:
+    //  1) Title override (most reliable full save access)
+    //  2) fsOpen_SaveData + user picker
+    (void)accessMode_;
+
     boxes_.assign(32, Box{kDefaultBoxSlots});
     for (std::size_t i = 0; i < boxes_.size(); ++i) {
         boxes_[i].setName("Box " + std::to_string(i + 1));

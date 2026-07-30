@@ -20,6 +20,7 @@ Next-generation multi-generation Pokémon save editor and Hub manager for **Atmo
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | UI navigation |
 | [docs/BOREALIS_SETUP.md](docs/BOREALIS_SETUP.md) | XITRIX Borealis, desktop + Switch |
 | [docs/HUB_FORMAT.md](docs/HUB_FORMAT.md) | Versioned binary + JSON Hub layout |
+| [docs/QUESTIONS.md](docs/QUESTIONS.md) | Remaining soft questions |
 
 ## Quick start (desktop / host)
 

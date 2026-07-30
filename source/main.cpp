@@ -1,25 +1,26 @@
 /**
- * PKHub — Nintendo Switch Pokémon save editor / Hub manager
- *
- * Phase 0 skeleton: boots Borealis (when available) or a headless stub.
- * Desktop Borealis target is preferred for UI iteration.
+ * PKHub entrypoint — Borealis UI when linked, otherwise headless smoke.
  */
 
 #include <cstdio>
 #include <memory>
 #include <string>
 
+#include "pkhub/app/AppContext.hpp"
 #include "pkhub/backends/SaveDiscovery.hpp"
+#include "pkhub/backends/RawSaveBackend.hpp"
+#include "pkhub/backends/SwitchSaveBackend.hpp"
 #include "pkhub/backends/UnsupportedSaveBackend.hpp"
-#include "pkhub/core/backup/BackupService.hpp"
-#include "pkhub/core/fs/Paths.hpp"
-#include "pkhub/core/hub/HubStorage.hpp"
-#include "pkhub/core/pokemon/GameId.hpp"
-#include "pkhub/core/save/SaveSession.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
+#include "pkhub/ui/UiBootstrap.hpp"
+
+#include <cstdlib>
 
 #if defined(PKHUB_HAS_BOREALIS)
 #include <borealis.hpp>
+#include "pkhub/ui/activities/MainActivity.hpp"
+#include "pkhub/ui/views/BoxGridView.hpp"
+#include "pkhub/ui/views/PokemonSlotView.hpp"
 #endif
 
 namespace {
@@ -29,78 +30,131 @@ constexpr const char* kAppVersion = "0.1.0-dev";
 
 #if defined(PKHUB_HAS_BOREALIS)
 
+using namespace pkhub;
+
+static brls::View* buildSwitchGamesTab() {
+    auto* list = new brls::List();
+    for (const auto& d : scanKnownSwitchTitles()) {
+        auto* item = new brls::ListItem(
+            d.displayName,
+            d.formatSupported ? "Official Switch save" : "Format not yet documented");
+        DetectedSave detected = d;
+        item->registerClickAction([detected](brls::View*) {
+            auto& ctx = AppContext::instance();
+            SwitchSaveBackendFactory factory;
+            auto backend = factory.create(detected);
+            if (!backend) {
+                brls::Application::notify("Unable to create backend");
+                return true;
+            }
+            auto st = ctx.session().attachBackend(std::move(backend));
+            if (st.result != SaveOpenResult::Ok) {
+                brls::Application::notify(st.message);
+                return true;
+            }
+            brls::Application::pushActivity(new brls::Activity(
+                ui::buildSaveWorkspace(ctx.session().backend(), detected.displayName)));
+            return true;
+        });
+        list->addView(item);
+    }
+    return list;
+}
+
+static brls::View* buildEmuTab() {
+    auto* list = new brls::List();
+    auto* openPath = new brls::ListItem("Open raw save path…", "Phase 1: set PKHUB_TEST_SAVE");
+    openPath->registerClickAction([](brls::View*) {
+        const char* path = std::getenv("PKHUB_TEST_SAVE");
+        if (!path || !*path) {
+            brls::Application::notify("Set PKHUB_TEST_SAVE to a .sav/.srm file");
+            return true;
+        }
+        DetectedSave d;
+        d.path = path;
+        d.displayName = path;
+        RawSaveBackendFactory factory;
+        auto backend = factory.create(d);
+        auto& ctx = AppContext::instance();
+        auto st = ctx.session().attachBackend(std::move(backend));
+        if (st.result != SaveOpenResult::Ok) {
+            brls::Application::notify(st.message);
+            return true;
+        }
+        brls::Application::pushActivity(new brls::Activity(
+            ui::buildSaveWorkspace(ctx.session().backend(), path)));
+        return true;
+    });
+    list->addView(openPath);
+    list->addView(new brls::ListItem("RetroArch scan", "Coming next"));
+    return list;
+}
+
+static brls::View* buildHubTab() {
+    auto* list = new brls::List();
+    auto* open = new brls::ListItem("Open Hub Storage", "Persistent multi-gen boxes");
+    open->registerClickAction([](brls::View*) {
+        auto& ctx = AppContext::instance();
+        brls::Application::pushActivity(new brls::Activity(
+            ui::buildSaveWorkspace(&ctx.hub(), "Hub Storage")));
+        return true;
+    });
+    list->addView(open);
+    return list;
+}
+
 int runBorealisUi() {
     if (!brls::Application::init()) {
         brls::Logger::error("Unable to init Borealis");
         return 1;
     }
 
+    pkhub::ui::registerCustomViews();
     brls::Application::createWindow(std::string(kAppName) + " " + kAppVersion);
 
     auto* root = new brls::TabFrame();
     root->setTitle(kAppName);
-
-    auto* switchTab = new brls::List();
-    switchTab->addView(new brls::ListItem("Scarlet / Violet", "Official Switch save"));
-    switchTab->addView(new brls::ListItem("Sword / Shield", "Official Switch save"));
-    switchTab->addView(new brls::ListItem("Legends: Arceus", "Official Switch save"));
-    switchTab->addView(new brls::ListItem("BDSP", "Official Switch save"));
-    switchTab->addView(new brls::ListItem(
-        "Legends: Z-A", "Format not yet documented — stub only"));
-
-    auto* emuTab = new brls::List();
-    emuTab->addView(new brls::ListItem("Scan RetroArch saves", "GBA → DS → 3DS"));
-    emuTab->addView(new brls::ListItem("Browse files…", "Manual .sav / .dsv / .srm"));
-
-    auto* hubTab = new brls::List();
-    hubTab->addView(new brls::ListItem("Open Hub Storage", "Persistent multi-gen boxes"));
-    hubTab->addView(new brls::ListItem("Create box", "Phase 1"));
-
-    root->addTab("Switch Games", switchTab);
-    root->addTab("Emulator Saves", emuTab);
-    root->addTab("Hub Storage", hubTab);
+    root->addTab("Switch Games", buildSwitchGamesTab());
+    root->addTab("Emulator Saves", buildEmuTab());
+    root->addTab("Hub Storage", buildHubTab());
 
     brls::Application::pushActivity(new brls::Activity(root));
 
     while (brls::Application::mainLoop()) {
     }
-
     return 0;
 }
 
 #endif
 
 int runHeadlessSmoke() {
-    std::printf("%s %s — headless smoke (Borealis not linked)\n", kAppName, kAppVersion);
+    std::printf("%s %s — headless smoke\n", kAppName, kAppVersion);
+    auto& ctx = pkhub::AppContext::instance();
+    if (!ctx.initialize()) {
+        std::printf("Failed to init AppContext\n");
+        return 1;
+    }
 
-    pkhub::fs::ensureAppDirectories();
-
-    pkhub::HubStorage hub;
-    pkhub::BackupService backups;
-    auto hubStatus = hub.openOrCreate();
-    std::printf("Hub: %s\n", hubStatus.message.c_str());
-
-    pkhub::SaveSession session(hub, backups);
     auto detected = pkhub::scanKnownSwitchTitles();
-    std::printf("Known Switch titles listed: %zu\n", detected.size());
+    std::printf("Switch titles: %zu\n", detected.size());
     for (const auto& d : detected) {
-        std::printf("  - %s (0x%016llX)%s\n", d.displayName.c_str(),
-                    static_cast<unsigned long long>(d.titleId),
-                    d.formatSupported ? "" : " [stub: format not documented]");
+        std::printf("  - %s%s\n", d.displayName.c_str(),
+                    d.formatSupported ? "" : " [stub]");
     }
 
     auto za = pkhub::makeLegendsZAStub();
-    auto zaStatus = za->open();
-    std::printf("Z-A stub: %s\n", zaStatus.message.c_str());
+    std::printf("Z-A: %s\n", za->open().message.c_str());
 
     pkhub::SafetyPolicy safety;
     auto soft = safety.evaluate(pkhub::SafetyAction::InjectLikelyIllegal);
     auto hard = safety.evaluate(pkhub::SafetyAction::RawHexEdit);
-    std::printf("Safety: illegal inject=%s raw hex=%s\n",
-                soft.gate == pkhub::SafetyGate::SoftWarn ? "soft-warn" : "?",
-                hard.gate == pkhub::SafetyGate::RequireConfirm ? "confirm" : "?");
+    std::printf("Safety soft=%d confirm=%d\n",
+                soft.gate == pkhub::SafetyGate::SoftWarn,
+                hard.gate == pkhub::SafetyGate::RequireConfirm);
 
-    std::printf("OK — skeleton ready.\n");
+    std::printf("Hub boxes: %zu\n", ctx.hub().boxCount());
+    ctx.shutdown();
+    std::printf("OK\n");
     return 0;
 }
 
@@ -110,9 +164,14 @@ int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
 
+    auto& ctx = pkhub::AppContext::instance();
+    ctx.initialize();
+
 #if defined(PKHUB_HAS_BOREALIS)
-    return runBorealisUi();
+    const int rc = runBorealisUi();
 #else
-    return runHeadlessSmoke();
+    const int rc = runHeadlessSmoke();
 #endif
+    ctx.shutdown();
+    return rc;
 }

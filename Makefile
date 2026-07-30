@@ -1,10 +1,13 @@
-.PHONY: desktop switch host test clean
+.PHONY: desktop switch host test clean ui
 
-# Desktop / host (preferred for UI iteration once Borealis is present)
 desktop:
-	cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPLATFORM_SWITCH=OFF
+	cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPLATFORM_SWITCH=OFF -DPKHUB_ENABLE_UI=OFF
 	cmake --build build/desktop -j
 	ctest --test-dir build/desktop --output-on-failure
+
+ui:
+	cmake -B build/ui -DPLATFORM_DESKTOP=ON -DPLATFORM_SWITCH=OFF -DPKHUB_ENABLE_UI=ON
+	cmake --build build/ui -j
 
 host: desktop
 

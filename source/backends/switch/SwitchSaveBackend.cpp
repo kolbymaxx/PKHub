@@ -17,6 +17,7 @@ SaveOpenStatus SwitchSaveBackend::open() {
     // Phase 1 mount order when accessMode_ == Auto:
     //  1) Title override (most reliable full save access)
     //  2) fsOpen_SaveData + user picker
+    // Device libnx mount lands in a follow-up; desktop uses empty placeholder boxes.
     (void)accessMode_;
 
     boxes_.assign(32, Box{kDefaultBoxSlots});
@@ -26,7 +27,15 @@ SaveOpenStatus SwitchSaveBackend::open() {
     party_ = Party{};
     open_ = true;
     dirty_ = false;
-    return {SaveOpenResult::Ok, "SwitchSaveBackend skeleton open"};
+
+#if defined(__SWITCH__)
+    return {SaveOpenResult::Ok,
+            "Mounted skeleton — prefer title override; fsOpen_SaveData parse TBD"};
+#else
+    return {SaveOpenResult::Ok,
+            "Desktop placeholder boxes for " + std::string(gameDisplayName(game_)) +
+                " (Switch mount requires device build)"};
+#endif
 }
 
 void SwitchSaveBackend::close() {

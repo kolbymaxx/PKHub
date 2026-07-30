@@ -1,5 +1,7 @@
 #include "pkhub/backends/SwitchSaveBackend.hpp"
 
+#include "pkhub/backends/switch/SwitchSaveParser.hpp"
+
 #include <string>
 
 namespace pkhub {
@@ -8,40 +10,64 @@ SwitchSaveBackend::SwitchSaveBackend(GameId game,
                                      uint64_t titleId,
                                      SwitchUserId userId,
                                      SaveAccessMode accessMode)
-    : game_(game), titleId_(titleId), userId_(userId), accessMode_(accessMode) {
-    (void)userId_;
-    (void)titleId_;
-}
+    : game_(game), titleId_(titleId), userId_(userId), accessMode_(accessMode) {}
 
 SaveOpenStatus SwitchSaveBackend::open() {
-    // Phase 1 mount order when accessMode_ == Auto:
-    //  1) Title override (most reliable full save access)
-    //  2) fsOpen_SaveData + user picker
-    // Device libnx mount lands in a follow-up; desktop uses empty placeholder boxes.
-    (void)accessMode_;
+    SwitchMountRequest req;
+    req.titleId = titleId_;
+    req.mode = accessMode_;
+    req.user = userId_;
+    req.saveFileName = "main";
 
-    boxes_.assign(32, Box{kDefaultBoxSlots});
-    for (std::size_t i = 0; i < boxes_.size(); ++i) {
-        boxes_[i].setName("Box " + std::to_string(i + 1));
+    auto mounted = mount_.mountAndRead(req);
+    modeUsed_ = mounted.modeUsed;
+    mountMessage_ = mounted.message;
+
+    if (mounted.status != MountStatus::Ok) {
+        open_ = false;
+        SaveOpenResult code = SaveOpenResult::IoError;
+        if (mounted.status == MountStatus::NotFound) {
+            code = SaveOpenResult::NotFound;
+        } else if (mounted.status == MountStatus::PermissionDenied ||
+                   mounted.status == MountStatus::TitleMismatch ||
+                   mounted.status == MountStatus::UserRequired) {
+            code = SaveOpenResult::PermissionDenied;
+        } else if (mounted.status == MountStatus::NotAvailable) {
+            code = SaveOpenResult::Unsupported;
+        }
+        return {code, mounted.message};
     }
-    party_ = Party{};
+
+    raw_ = std::move(mounted.data);
+    saveFileName_ = mounted.saveFileName;
+
+    auto parsed = parseSwitchSave(game_, raw_);
+    if (!parsed.ok) {
+        mount_.unmount();
+        return {SaveOpenResult::Corrupt, parsed.message};
+    }
+    boxes_ = std::move(parsed.boxes);
+    party_ = std::move(parsed.party);
+    parseImplemented_ = parsed.parseImplemented;
     open_ = true;
     dirty_ = false;
 
-#if defined(__SWITCH__)
-    return {SaveOpenResult::Ok,
-            "Mounted skeleton — prefer title override; fsOpen_SaveData parse TBD"};
-#else
-    return {SaveOpenResult::Ok,
-            "Desktop placeholder boxes for " + std::string(gameDisplayName(game_)) +
-                " (Switch mount requires device build)"};
-#endif
+    std::string msg = mounted.message;
+    if (!parsed.message.empty()) {
+        msg += " | " + parsed.message;
+    }
+    mountMessage_ = msg;
+    return {SaveOpenResult::Ok, msg};
 }
 
 void SwitchSaveBackend::close() {
+    mount_.unmount();
     boxes_.clear();
+    party_ = Party{};
+    raw_.clear();
     open_ = false;
     dirty_ = false;
+    parseImplemented_ = false;
 }
 
 SaveOpenStatus SwitchSaveBackend::reload() {
@@ -53,9 +79,26 @@ SaveOpenStatus SwitchSaveBackend::commit() {
     if (!open_) {
         return {SaveOpenResult::NotFound, "Not open"};
     }
-    // TODO(phase1): serialize + fs write
+
+    std::vector<uint8_t> out;
+    std::string err;
+    if (!serializeSwitchSave(game_, raw_, party_, boxes_, out, &err)) {
+        return {SaveOpenResult::IoError, err};
+    }
+
+    SwitchMountRequest req;
+    req.titleId = titleId_;
+    req.mode = modeUsed_;
+    req.user = userId_;
+    req.saveFileName = saveFileName_;
+
+    auto written = mount_.write(req, modeUsed_, saveFileName_, out);
+    if (written.status != MountStatus::Ok) {
+        return {SaveOpenResult::IoError, written.message};
+    }
+    raw_ = std::move(out);
     dirty_ = false;
-    return {SaveOpenResult::Ok, "SwitchSaveBackend commit stub"};
+    return {SaveOpenResult::Ok, written.message};
 }
 
 std::string SwitchSaveBackend::displayName() const {

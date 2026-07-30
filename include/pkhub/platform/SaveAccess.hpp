@@ -20,11 +20,18 @@ enum class SaveAccessMode : uint8_t {
 
 const char* saveAccessModeLabel(SaveAccessMode mode);
 
+/// Switch account UID (matches libnx AccountUid layout conceptually).
+struct SwitchUserId {
+    uint64_t uid[2]{0, 0};
+
+    bool isZero() const { return uid[0] == 0 && uid[1] == 0; }
+};
+
 struct SwitchMountRequest {
     uint64_t titleId = 0;
     SaveAccessMode mode = SaveAccessMode::Auto;
-    /// When using FsSaveData; zero means prompt / use selected user.
-    uint64_t userUid[2]{0, 0};
+    SwitchUserId user{};
+    std::string saveFileName = "main";
 };
 
 }  // namespace pkhub

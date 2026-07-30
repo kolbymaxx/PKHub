@@ -12,6 +12,7 @@
 #include "pkhub/backends/SwitchSaveBackend.hpp"
 #include "pkhub/backends/UnsupportedSaveBackend.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
+#include "pkhub/platform/SwitchSaveMount.hpp"
 #include "pkhub/ui/UiBootstrap.hpp"
 
 #include <cstdlib>
@@ -34,10 +35,17 @@ using namespace pkhub;
 
 static brls::View* buildSwitchGamesTab() {
     auto* list = new brls::List();
+    list->addView(new brls::ListItem(
+        "Title override tip",
+        "Hold R while launching the game, then open PKHub for reliable save access"));
     for (const auto& d : scanKnownSwitchTitles()) {
         auto* item = new brls::ListItem(
             d.displayName,
-            d.formatSupported ? "Official Switch save" : "Format not yet documented");
+            d.formatSupported
+                ? (std::string("Official save · ") +
+                   (SwitchSaveMount::isTitleOverrideFor(d.titleId) ? "override active"
+                                                                   : "auto mount"))
+                : "Format not yet documented");
         DetectedSave detected = d;
         item->registerClickAction([detected](brls::View*) {
             auto& ctx = AppContext::instance();

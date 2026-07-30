@@ -1,0 +1,10 @@
+{
+  "PKHub": "PKHub",
+  "tab/switch_games": "Switch Games",
+  "tab/emulator_saves": "Emulator Saves",
+  "tab/hub_storage": "Hub Storage",
+  "warning/online_risk": "Editing this save may affect online play and Pokémon HOME.",
+  "action/backup_ok": "Backup created",
+  "action/save": "Save",
+  "action/cancel": "Cancel"
+}

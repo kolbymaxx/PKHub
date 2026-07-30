@@ -1,0 +1,17 @@
+<brls:Frame
+    id="main"
+    title="@i18n/PKHub"
+    headerCollapsed="false"
+    footerHidden="false">
+
+    <brls:TabFrame
+        id="home_tabs"
+        sidebarPosition="left">
+
+        <!-- Populated from C++ in Phase 1; XML placeholder for structure -->
+        <brls:Tab label="@i18n/tab/switch_games" />
+        <brls:Tab label="@i18n/tab/emulator_saves" />
+        <brls:Tab label="@i18n/tab/hub_storage" />
+
+    </brls:TabFrame>
+</brls:Frame>

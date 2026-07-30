@@ -1,0 +1,7 @@
+# Prerequisites: Atmosphere + PKHub.nro under /switch/PKHub/
+
+[Desktop]
+Name=PKHub
+Author=PKHub Contributors
+Version=0.1.0
+# Title ID placeholder for homebrew menu metadata consumers

@@ -1,0 +1,23 @@
+<brls:AppletFrame
+    iconInterpolation="linear"
+    headerHidden="false"
+    footerHidden="false"
+    title="PKHub">
+
+    <brls:TabFrame
+        sidebarPosition="left">
+
+        <brls:Tab label="Switch Games" >
+            <brls:Rectangle color="#1b1d24" width="100%" height="100%"/>
+        </brls:Tab>
+
+        <brls:Tab label="Emulator Saves" >
+            <brls:Rectangle color="#1b1d24" width="100%" height="100%"/>
+        </brls:Tab>
+
+        <brls:Tab label="Hub Storage" >
+            <brls:Rectangle color="#1b1d24" width="100%" height="100%"/>
+        </brls:Tab>
+
+    </brls:TabFrame>
+</brls:AppletFrame>

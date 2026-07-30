@@ -10,5 +10,9 @@ constexpr int kJsonFormatVersion = 1;
 
 constexpr const char* kHubJsonName = "hub.json";
 constexpr const char* kDataDirName = "data/boxes";
+constexpr const char* kHoldingPkboxName = "holding.pkbox";
+constexpr const char* kAppMinVersion = "0.1.0";
+
+constexpr uint16_t kCodecVersion = 1;
 
 }  // namespace pkhub::hub_format

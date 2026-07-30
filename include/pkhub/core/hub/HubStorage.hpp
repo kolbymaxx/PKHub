@@ -2,11 +2,11 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
 
 #include "pkhub/core/pokemon/GameId.hpp"
+#include "pkhub/core/pokemon/Pokemon.hpp"
 #include "pkhub/core/save/ISaveBackend.hpp"
 
 namespace pkhub {
@@ -20,6 +20,11 @@ struct HubConfig {
 /**
  * Persistent Hub Storage — first-class IBoxProvider.
  * Stores Pokémon independently of any game save for cross-game moves.
+ *
+ * On-disk layout under rootPath:
+ *   hub.json
+ *   data/boxes/0000.pkbox …
+ *   holding.pkbox
  */
 class HubStorage : public IBoxProvider {
 public:
@@ -54,6 +59,21 @@ public:
     const std::string& rootPath() const { return config_.rootPath; }
 
 private:
+    std::string joinPath(const std::string& relative) const;
+    std::string boxPkboxPath(std::size_t index) const;
+    std::string hubJsonPath() const;
+    std::string holdingPkboxPath() const;
+    std::string boxesDirPath() const;
+
+    void resetInMemoryDefaults();
+    SaveOpenStatus loadFromDisk();
+    SaveOpenStatus writeToDisk();
+
+    SaveOpenStatus loadHubJson();
+    SaveOpenStatus writeHubJson() const;
+    SaveOpenStatus loadPkboxFile(const std::string& path, std::vector<Pokemon>& slots);
+    SaveOpenStatus writePkboxFile(const std::string& path, const std::vector<Pokemon>& slots) const;
+
     HubConfig config_;
     bool open_ = false;
     bool dirty_ = false;

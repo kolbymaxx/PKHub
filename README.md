@@ -8,9 +8,7 @@ Next-generation multi-generation Pokémon save editor and Hub manager for **Atmo
 
 ## Status
 
-**Phase 0 — Architecture & skeleton**
-
-Locked product decisions are in [docs/DECISIONS.md](docs/DECISIONS.md).
+**Phase 1 in progress** — see [docs/PHASE1.md](docs/PHASE1.md) and [docs/DECISIONS.md](docs/DECISIONS.md).
 
 ## Docs
 
@@ -18,6 +16,7 @@ Locked product decisions are in [docs/DECISIONS.md](docs/DECISIONS.md).
 |-----|----------|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Layers, folders, data flow |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Locked Phase 1+ decisions |
+| [docs/PHASE1.md](docs/PHASE1.md) | Phase 1 progress / next steps |
 | [docs/NAVIGATION.md](docs/NAVIGATION.md) | UI navigation |
 | [docs/BOREALIS_SETUP.md](docs/BOREALIS_SETUP.md) | XITRIX Borealis, desktop + Switch |
 | [docs/HUB_FORMAT.md](docs/HUB_FORMAT.md) | Versioned binary + JSON Hub layout |
@@ -26,19 +25,24 @@ Locked product decisions are in [docs/DECISIONS.md](docs/DECISIONS.md).
 ## Quick start (desktop / host)
 
 ```bash
-# Headless core smoke (no Borealis submodule yet)
-cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPLATFORM_SWITCH=OFF
+# Headless core + tests (default; no GUI deps)
+cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPLATFORM_SWITCH=OFF -DPKHUB_ENABLE_UI=OFF
 cmake --build build/desktop -j
 ctest --test-dir build/desktop --output-on-failure
 ./build/desktop/PKHub
 ```
 
-With Borealis (UI iteration):
+Borealis UI (needs X11/Wayland + GL — see `docs/BOREALIS_SETUP.md`):
 
 ```bash
-git submodule add -b moonlight_wiliwili https://github.com/XITRIX/borealis.git libs/borealis
+cmake -B build/ui -DPLATFORM_DESKTOP=ON -DPKHUB_ENABLE_UI=ON
+cmake --build build/ui -j
+```
+
+Borealis submodule (already wired on Phase 1 branch):
+
+```bash
 git submodule update --init --recursive
-# then same cmake -DPLATFORM_DESKTOP=ON …
 ```
 
 ## Switch build

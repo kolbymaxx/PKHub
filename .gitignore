@@ -28,6 +28,7 @@ Thumbs.db
 *.srm
 *.bk*
 sdmc/
+pkhub_data/
 
 # Submodule checkouts may contain build artifacts
 libs/**/build/

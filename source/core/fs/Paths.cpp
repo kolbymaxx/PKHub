@@ -42,6 +42,18 @@ std::string resolvePath(const std::string& p) {
         const std::string rest = p.substr(std::strlen(kSdmcPrefix));
         return hostDataRoot() + rest;
     }
+    // Map other sdmc:/ paths → data root + /rest
+    if (p.rfind("sdmc:", 0) == 0) {
+        std::string rest = p.substr(5);  // after "sdmc:"
+        if (rest.empty() || rest[0] != '/') {
+            rest = "/" + rest;
+        }
+        return hostDataRoot() + rest;
+    }
+    // Absolute SD-style paths used by RetroArch defaults
+    if (!p.empty() && p[0] == '/') {
+        return hostDataRoot() + p;
+    }
     return p;
 #endif
 }

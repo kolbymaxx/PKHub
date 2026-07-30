@@ -20,6 +20,7 @@ struct DetectedSave {
     bool isSwitchOfficial = false;
     bool formatSupported = true;  // false → UnsupportedSaveBackend stub
     std::string unsupportedReason;
+    std::string formatHint;  // e.g. "GBA", "NDS", "DSV"
 };
 
 class ISaveBackendFactory {
@@ -40,8 +41,15 @@ public:
     SaveBackendPtr create(const DetectedSave& detected) const override;
 };
 
+/// Default RetroArch / Checkpoint-style roots on Switch SD.
+std::vector<std::string> defaultEmulatorSaveRoots();
+
 std::vector<DetectedSave> scanKnownSwitchTitles();
-std::vector<DetectedSave> scanRetroArchSaves(const std::vector<std::string>& roots);
+
+/// Walk roots for .sav / .srm / .dsv (and common 3DS dump extensions later).
+std::vector<DetectedSave> scanRetroArchSaves(const std::vector<std::string>& roots = {});
+
+/// Inspect a single file path; nullopt if missing / not a supported save extension.
 std::optional<DetectedSave> detectRawSaveFile(const std::string& path);
 
 }  // namespace pkhub

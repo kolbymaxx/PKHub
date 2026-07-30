@@ -40,4 +40,18 @@ bool encodeBoxMon(const Pokemon& in, uint8_t* dst80);
 /// Decode party mon (100 bytes); uses the trailing battle stats for level when present.
 bool decodePartyMon(const uint8_t* src100, Pokemon& out);
 
+/// Encode party mon (100 bytes): box structure + minimal battle-stats trailer.
+bool encodePartyMon(const Pokemon& in, uint8_t* dst100);
+
+/**
+ * Write party + PC boxes back into a Gen 3 save buffer in-place.
+ * Updates the active slot (higher save index), section checksums, and bumps saveIndex.
+ * Preserves bytes beyond 0x20000 (RTC footer). Returns false on failure.
+ */
+bool writeSave(std::vector<uint8_t>& data,
+               GameId game,
+               const Party& party,
+               const std::vector<Box>& boxes,
+               std::string* err = nullptr);
+
 }  // namespace pkhub::gba

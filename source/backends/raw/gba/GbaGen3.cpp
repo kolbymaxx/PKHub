@@ -302,6 +302,82 @@ std::vector<uint8_t> concatPc(const SlotInfo& slot) {
     return pc;
 }
 
+// Public Gen 3 section payload sizes used for checksum (pokeemerald / community docs).
+constexpr uint16_t kSectionChecksumSize[kSectionsPerSlot] = {
+    0xF24, 0xF80, 0xF80, 0xF80, 0xF08, 0xF80, 0xF80,
+    0xF80, 0xF80, 0xF80, 0xF80, 0xF80, 0xF80, 0x7D0,
+};
+
+uint16_t sectionChecksum(const uint8_t* section, uint16_t byteSize) {
+    uint32_t sum = 0;
+    const std::size_t words = byteSize / 4;
+    for (std::size_t i = 0; i < words; ++i) {
+        sum += read32(section + i * 4);
+    }
+    return static_cast<uint16_t>((sum + (sum >> 16)) & 0xFFFF);
+}
+
+void writeSectionFooter(uint8_t* section, uint16_t id, uint32_t saveIndex) {
+    const uint16_t chkSize = kSectionChecksumSize[id < kSectionsPerSlot ? id : 0];
+    const uint16_t chk = sectionChecksum(section, chkSize);
+    write16(section + 0x0FF4, id);
+    write16(section + 0x0FF6, chk);
+    write32(section + 0x0FF8, kSectionSignature);
+    write32(section + 0x0FFC, saveIndex);
+}
+
+struct MutableSlot {
+    std::array<uint8_t*, kSectionsPerSlot> byId{};
+    uint32_t saveIndex = 0;
+    int validCount = 0;
+    std::size_t slotBaseOffset = 0;
+};
+
+MutableSlot scanMutableSlot(uint8_t* saveBase, std::size_t slotBaseOffset) {
+    MutableSlot info;
+    info.byId.fill(nullptr);
+    info.slotBaseOffset = slotBaseOffset;
+    uint8_t* slotBase = saveBase + slotBaseOffset;
+    for (std::size_t i = 0; i < kSectionsPerSlot; ++i) {
+        uint8_t* sec = slotBase + i * kSectionSize;
+        const SectionView v = readSectionFooter(sec);
+        if (!v.valid) {
+            continue;
+        }
+        info.byId[v.id] = sec;
+        info.saveIndex = v.saveIndex;
+        ++info.validCount;
+    }
+    return info;
+}
+
+void partyOffsetsForGame(GameId game, std::size_t& countOff, std::size_t& partyOff) {
+    const bool frlg = (game == GameId::FireRed || game == GameId::LeafGreen);
+    if (frlg) {
+        countOff = 0x0034;
+        partyOff = 0x0038;
+    } else {
+        countOff = 0x0234;
+        partyOff = 0x0238;
+    }
+}
+
+bool writePokemonBytes(const Pokemon& mon, bool party, uint8_t* dst, std::size_t dstSize) {
+    if (!dst || dstSize < (party ? kPartyMonSize : kBoxMonSize)) {
+        return false;
+    }
+    if (mon.empty()) {
+        std::memset(dst, 0, party ? kPartyMonSize : kBoxMonSize);
+        return true;
+    }
+    // Prefer re-encode from unified fields so editor changes (shiny/level/etc.) persist.
+    // nativeBlob is only used when encode is skipped for empty — see above.
+    if (party) {
+        return encodePartyMon(mon, dst);
+    }
+    return encodeBoxMon(mon, dst);
+}
+
 }  // namespace
 
 bool decodeBoxMon(const uint8_t* src80, Pokemon& out) {
@@ -453,6 +529,148 @@ bool encodeBoxMon(const Pokemon& in, uint8_t* dst80) {
     write32(subs[kSubMisc] + 4, ivEggAb);
 
     encryptFromSubstructs(pid, otId, subs, dst80);
+    return true;
+}
+
+bool encodePartyMon(const Pokemon& in, uint8_t* dst100) {
+    if (!dst100) {
+        return false;
+    }
+    std::memset(dst100, 0, kPartyMonSize);
+    if (in.empty()) {
+        return true;
+    }
+    if (!encodeBoxMon(in, dst100)) {
+        return false;
+    }
+    // Battle stats trailer (0x50..0x63). Phase 1: minimal valid-looking values.
+    write32(dst100 + 0x50, 0);  // status
+    dst100[0x54] = in.level == 0 ? 1 : in.level;
+    dst100[0x55] = 0;
+    const uint16_t hp = 20;  // placeholder; full base-stat calc later
+    write16(dst100 + 0x56, hp);
+    write16(dst100 + 0x58, hp);
+    write16(dst100 + 0x5A, 10);
+    write16(dst100 + 0x5C, 10);
+    write16(dst100 + 0x5E, 10);
+    write16(dst100 + 0x60, 10);
+    write16(dst100 + 0x62, 10);
+    return true;
+}
+
+bool writeSave(std::vector<uint8_t>& data,
+               GameId game,
+               const Party& party,
+               const std::vector<Box>& boxes,
+               std::string* err) {
+    auto fail = [&](const char* msg) {
+        if (err) {
+            *err = msg;
+        }
+        return false;
+    };
+
+    if (data.size() < kGbaSaveSize) {
+        return fail("Save too small for Gen 3 GBA write-back");
+    }
+    if (boxes.size() < kBoxCount) {
+        return fail("Expected 14 PC boxes");
+    }
+
+    uint8_t* base = data.data();
+    MutableSlot slotA = scanMutableSlot(base, 0);
+    MutableSlot slotB = scanMutableSlot(base, kSlotSize);
+
+    MutableSlot* active = nullptr;
+    if (slotA.validCount == 0 && slotB.validCount == 0) {
+        return fail("No valid Gen 3 save sections found");
+    }
+    if (slotA.validCount == 0) {
+        active = &slotB;
+    } else if (slotB.validCount == 0) {
+        active = &slotA;
+    } else {
+        active = (slotB.saveIndex > slotA.saveIndex) ? &slotB : &slotA;
+    }
+
+    // Ensure required sections exist.
+    if (!active->byId[1]) {
+        return fail("Missing Team/Items section");
+    }
+    for (uint16_t id = 5; id <= 13; ++id) {
+        if (!active->byId[id]) {
+            return fail("Missing PC storage section");
+        }
+    }
+
+    const uint32_t newSaveIndex = active->saveIndex + 1;
+
+    // --- Party ---
+    std::size_t countOff = 0x0234;
+    std::size_t partyOff = 0x0238;
+    partyOffsetsForGame(game, countOff, partyOff);
+
+    uint8_t* team = active->byId[1];
+    uint32_t count = 0;
+    for (std::size_t i = 0; i < kPartySlots; ++i) {
+        const Pokemon& mon = party.slot(i);
+        uint8_t* dst = team + partyOff + i * kPartyMonSize;
+        if (!writePokemonBytes(mon, true, dst, kPartyMonSize)) {
+            return fail("Failed to encode party Pokémon");
+        }
+        if (!mon.empty()) {
+            count = static_cast<uint32_t>(i + 1);
+        }
+    }
+    // Compact rule: count = last occupied index + 1 (standard in-game layout).
+    write32(team + countOff, count);
+
+    // --- PC boxes ---
+    constexpr std::size_t kPayload = 0xF80;
+    constexpr std::size_t kPokemonStart = 4;
+    std::vector<uint8_t> pc(9 * kPayload, 0);
+    // Preserve currentBox from existing PC.
+    {
+        std::vector<uint8_t> oldPc;
+        oldPc.reserve(9 * kPayload);
+        for (uint16_t id = 5; id <= 13; ++id) {
+            oldPc.insert(oldPc.end(), active->byId[id], active->byId[id] + kPayload);
+        }
+        if (oldPc.size() >= 4) {
+            std::memcpy(pc.data(), oldPc.data(), 4);
+        }
+    }
+
+    for (std::size_t box = 0; box < kBoxCount; ++box) {
+        for (std::size_t slot = 0; slot < kSlotsPerBox; ++slot) {
+            const std::size_t off = kPokemonStart + (box * kSlotsPerBox + slot) * kBoxMonSize;
+            if (off + kBoxMonSize > pc.size()) {
+                return fail("PC buffer overflow");
+            }
+            const Pokemon& mon = boxes[box].slot(slot);
+            if (!writePokemonBytes(mon, false, pc.data() + off, kBoxMonSize)) {
+                return fail("Failed to encode box Pokémon");
+            }
+        }
+    }
+
+    // Scatter PC back into sections 5–13.
+    for (uint16_t id = 5; id <= 13; ++id) {
+        const std::size_t chunk = static_cast<std::size_t>(id - 5) * kPayload;
+        std::memcpy(active->byId[id], pc.data() + chunk, kPayload);
+    }
+
+    // Re-checksum and bump saveIndex on every section in the active slot.
+    for (uint16_t id = 0; id < kSectionsPerSlot; ++id) {
+        if (!active->byId[id]) {
+            continue;
+        }
+        writeSectionFooter(active->byId[id], id, newSaveIndex);
+    }
+
+    if (err) {
+        err->clear();
+    }
     return true;
 }
 

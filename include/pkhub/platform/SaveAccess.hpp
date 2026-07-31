@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace pkhub {
 
@@ -20,11 +21,26 @@ enum class SaveAccessMode : uint8_t {
 
 const char* saveAccessModeLabel(SaveAccessMode mode);
 
+/// Switch account UID (matches libnx AccountUid layout conceptually).
+struct SwitchUserId {
+    uint64_t uid[2]{0, 0};
+
+    bool isZero() const { return uid[0] == 0 && uid[1] == 0; }
+};
+
 struct SwitchMountRequest {
     uint64_t titleId = 0;
     SaveAccessMode mode = SaveAccessMode::Auto;
-    /// When using FsSaveData; zero means prompt / use selected user.
-    uint64_t userUid[2]{0, 0};
+    SwitchUserId user{};
+    std::string saveFileName = "main";
 };
+
+struct SwitchUserInfo {
+    SwitchUserId id{};
+    std::string nickname;
+};
+
+/// Enumerate local Switch users for FsSaveData mounts (empty on desktop).
+std::vector<SwitchUserInfo> listSwitchUsers();
 
 }  // namespace pkhub

@@ -7,13 +7,9 @@
 #include "pkhub/core/pokemon/GameId.hpp"
 #include "pkhub/core/save/ISaveBackend.hpp"
 #include "pkhub/platform/SaveAccess.hpp"
+#include "pkhub/platform/SwitchSaveMount.hpp"
 
 namespace pkhub {
-
-/// Switch account UID (matches libnx AccountUid layout conceptually).
-struct SwitchUserId {
-    uint64_t uid[2]{0, 0};
-};
 
 /**
  * Official Switch title saves via libnx.
@@ -45,16 +41,26 @@ public:
 
     SaveAccessMode accessMode() const { return accessMode_; }
     void setAccessMode(SaveAccessMode mode) { accessMode_ = mode; }
+    SaveAccessMode modeUsed() const { return modeUsed_; }
+    bool parseImplemented() const { return parseImplemented_; }
+    const std::string& lastMountMessage() const { return mountMessage_; }
+    const std::vector<uint8_t>& rawBytes() const { return raw_; }
 
 private:
     GameId game_;
     uint64_t titleId_;
     SwitchUserId userId_;
     SaveAccessMode accessMode_ = SaveAccessMode::Auto;
+    SaveAccessMode modeUsed_ = SaveAccessMode::Auto;
     bool open_ = false;
     bool dirty_ = false;
+    bool parseImplemented_ = false;
+    std::string mountMessage_;
+    std::string saveFileName_ = "main";
+    std::vector<uint8_t> raw_;
     std::vector<Box> boxes_;
     Party party_;
+    SwitchSaveMount mount_;
 };
 
 }  // namespace pkhub

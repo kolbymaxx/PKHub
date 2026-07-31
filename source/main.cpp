@@ -12,6 +12,8 @@
 #include "pkhub/backends/SwitchSaveBackend.hpp"
 #include "pkhub/backends/UnsupportedSaveBackend.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
+#include "pkhub/platform/SaveAccess.hpp"
+#include "pkhub/platform/SwitchSaveMount.hpp"
 #include "pkhub/ui/UiBootstrap.hpp"
 
 #include <cstdlib>
@@ -33,28 +35,72 @@ constexpr const char* kAppVersion = "0.1.0-dev";
 
 using namespace pkhub;
 
+static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId& user) {
+    auto& ctx = AppContext::instance();
+    if (!detected.formatSupported) {
+        brls::Application::notify(detected.unsupportedReason.empty()
+                                      ? "Format not yet documented"
+                                      : detected.unsupportedReason);
+        return true;
+    }
+    auto backend = std::make_unique<SwitchSaveBackend>(
+        detected.game, detected.titleId, user, SaveAccessMode::Auto);
+    auto st = ctx.session().attachBackend(std::move(backend));
+    if (st.result != SaveOpenResult::Ok) {
+        brls::Application::notify(st.message);
+        return true;
+    }
+    brls::Application::pushActivity(new brls::Activity(
+        ui::buildSaveWorkspace(ctx.session().backend(), detected.displayName)));
+    return true;
+}
+
 static brls::View* buildSwitchGamesTab() {
     auto* list = new brls::List();
+    list->addView(new brls::ListItem(
+        "Title override tip",
+        "Hold R while launching the game, then open PKHub for reliable save access"));
+
+    auto users = listSwitchUsers();
+    if (!users.empty()) {
+        list->addView(new brls::ListItem("Users found", std::to_string(users.size())));
+    }
+
     for (const auto& d : scanKnownSwitchTitles()) {
         auto* item = new brls::ListItem(
             d.displayName,
-            d.formatSupported ? "Official Switch save" : "Format not yet documented");
+            d.formatSupported
+                ? (std::string("Official save · ") +
+                   (SwitchSaveMount::isTitleOverrideFor(d.titleId) ? "override active"
+                                                                   : "auto mount"))
+                : "Format not yet documented");
         DetectedSave detected = d;
-        item->registerClickAction([detected](brls::View*) {
-            auto& ctx = AppContext::instance();
-            SwitchSaveBackendFactory factory;
-            auto backend = factory.create(detected);
-            if (!backend) {
-                brls::Application::notify("Unable to create backend");
-                return true;
+        item->registerClickAction([detected, users](brls::View*) {
+            if (users.size() <= 1) {
+                SwitchUserId uid = users.empty() ? SwitchUserId{} : users[0].id;
+                return openSwitchDetected(detected, uid);
             }
-            auto st = ctx.session().attachBackend(std::move(backend));
-            if (st.result != SaveOpenResult::Ok) {
-                brls::Application::notify(st.message);
-                return true;
+            auto* picker = new brls::List();
+            for (const auto& u : users) {
+                auto* ui = new brls::ListItem(u.nickname.empty() ? "User" : u.nickname,
+                                              "FsSaveData mount with this profile");
+                DetectedSave det = detected;
+                SwitchUserId uid = u.id;
+                ui->registerClickAction([det, uid](brls::View*) {
+                    return openSwitchDetected(det, uid);
+                });
+                picker->addView(ui);
             }
-            brls::Application::pushActivity(new brls::Activity(
-                ui::buildSaveWorkspace(ctx.session().backend(), detected.displayName)));
+            auto* overrideItem = new brls::ListItem("Use title override / preselected",
+                                                    "No explicit user id");
+            overrideItem->registerClickAction([detected](brls::View*) {
+                return openSwitchDetected(detected, {});
+            });
+            picker->addView(overrideItem);
+            auto* frame = new brls::AppletFrame();
+            frame->setTitle("Choose user — " + detected.displayName);
+            frame->setContentView(picker);
+            brls::Application::pushActivity(new brls::Activity(frame));
             return true;
         });
         list->addView(item);

@@ -4,6 +4,7 @@
 #include "pkhub/backends/SwitchSaveBackend.hpp"
 #include "pkhub/core/fs/Paths.hpp"
 #include "pkhub/core/pokemon/GameId.hpp"
+#include "pkhub/platform/SaveAccess.hpp"
 
 #include "json.hpp"
 
@@ -166,15 +167,30 @@ BackupResult BackupService::backupBeforeWrite(ISaveBackend& backend, const std::
         if (!fs::createDirectories(destDir)) {
             return {false, destDir, "Failed to create backup directory"};
         }
+        const auto& raw = sw->rawBytes();
+        if (!raw.empty()) {
+            const std::string mainPath = joinPath(destDir, "main");
+            std::ofstream bin(fs::resolvePath(mainPath), std::ios::binary | std::ios::trunc);
+            if (!bin) {
+                return {false, mainPath, "Failed to write Switch save backup bytes"};
+            }
+            bin.write(reinterpret_cast<const char*>(raw.data()),
+                      static_cast<std::streamsize>(raw.size()));
+            if (!bin) {
+                return {false, mainPath, "Failed to flush Switch save backup bytes"};
+            }
+        }
         const std::string markerPath = joinPath(destDir, "backup_marker.json");
         json marker = {
-            {"type", "switch_save_marker"},
+            {"type", "switch_save_backup"},
             {"label", label},
             {"displayName", sw->displayName()},
             {"gameId", static_cast<int>(sw->gameId())},
             {"game", gameDisplayName(sw->gameId())},
+            {"bytes", raw.size()},
+            {"parseImplemented", sw->parseImplemented()},
+            {"accessMode", saveAccessModeLabel(sw->modeUsed())},
             {"timestamp", timestampFolderName()},
-            {"note", "Mounted Switch saves are not file-copied in Phase 1; marker only."},
         };
         std::ofstream out(fs::resolvePath(markerPath), std::ios::trunc);
         if (!out) {
@@ -184,7 +200,7 @@ BackupResult BackupService::backupBeforeWrite(ISaveBackend& backend, const std::
         if (!out) {
             return {false, markerPath, "Failed to flush switch backup marker"};
         }
-        return {true, destDir, "Switch save marker written"};
+        return {true, destDir, raw.empty() ? "Switch save marker written" : "Switch save bytes backed up"};
     }
 
     // Unknown backend: still create a folder entry so callers can proceed safely.

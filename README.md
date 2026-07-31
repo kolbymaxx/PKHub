@@ -53,7 +53,7 @@ cmake -B build/switch -DPLATFORM_SWITCH=ON -DPLATFORM_DESKTOP=OFF \
 cmake --build build/switch -j
 ```
 
-Prefer **title override** when editing official saves; `fsOpen_SaveData` + user picker is also planned.
+Prefer **title override** when editing official saves; `fsOpen_SaveData` + user picker is supported for SwSh/SV.
 
 ## Highlights of locked decisions
 

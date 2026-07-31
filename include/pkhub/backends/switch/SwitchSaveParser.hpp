@@ -22,15 +22,13 @@ std::size_t switchBoxCountFor(GameId game);
 
 /**
  * Parse mounted Switch save bytes into boxes/party.
- * Phase 1: allocates empty boxes with correct counts; full SV/SwSh crypto parse later.
- * Detects obviously empty/missing buffers.
+ * SwSh / SV: SwishCrypto + PK8/PK9 party slots.
+ * BDSP / LA: mount works; full entity parse follows (LA uses PA8).
  */
 SwitchParseResult parseSwitchSave(GameId game, const std::vector<uint8_t>& data);
 
 /**
- * Serialize boxes/party back to save bytes.
- * Phase 1: if parse wasn't implemented, returns the original buffer unchanged
- * (no silent corruption). When parse lands, this becomes a real rewrite.
+ * Serialize boxes/party back to save bytes (SwishCrypto re-encrypt for SwSh/SV).
  */
 bool serializeSwitchSave(GameId game,
                          const std::vector<uint8_t>& original,

@@ -1,4 +1,6 @@
 #include "pkhub/backends/SwitchSaveBackend.hpp"
+#include "pkhub/backends/switch/PokeCrypto8.hpp"
+#include "pkhub/backends/switch/SwishCrypto.hpp"
 #include "pkhub/backends/switch/SwitchSaveParser.hpp"
 #include "pkhub/platform/SwitchSaveMount.hpp"
 #include "pkhub/platform/TitleIds.hpp"
@@ -7,11 +9,40 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <string>
 #include <vector>
 
 namespace {
+
+constexpr uint32_t kBox = 0x0d66012c;
+constexpr uint32_t kPartySv = 0x3AA1A9AD;
+
+std::vector<uint8_t> buildMinimalSvSave() {
+    using pkhub::ScBlock;
+    using pkhub::ScType;
+    using pkhub::SwishCrypto;
+
+    constexpr std::size_t boxes = 32;
+    constexpr std::size_t slots = 30;
+    constexpr std::size_t kSlot = pkhub::poke_crypto8::kPartySize;
+    ScBlock box;
+    box.key = kBox;
+    box.type = ScType::Object;
+    box.data.assign(boxes * slots * kSlot, 0);
+
+    ScBlock party;
+    party.key = kPartySv;
+    party.type = ScType::Object;
+    party.data.assign(6 * kSlot + 1, 0);
+
+    std::vector<ScBlock> blocks{box, party};
+    std::vector<uint8_t> enc;
+    std::string err;
+    assert(SwishCrypto::encrypt(blocks, enc, &err));
+    return enc;
+}
 
 void writeFixture(uint64_t titleId, const std::vector<uint8_t>& bytes) {
     const std::string logical = pkhub::SwitchSaveMount::desktopFixturePath(titleId, "main");
@@ -42,46 +73,42 @@ int main() {
     assert(switchBoxCountFor(GameId::Sword) == 32);
     assert(switchBoxCountFor(GameId::BrilliantDiamond) == 40);
 
-    // Parser: empty boxes, not yet decrypting Pokémon
+    // Invalid buffer is rejected for Swish titles
     {
         std::vector<uint8_t> fake(4096, 0x11);
         auto parsed = parseSwitchSave(GameId::Violet, fake);
-        assert(parsed.ok);
-        assert(!parsed.parseImplemented);
-        assert(parsed.boxes.size() == 32);
-        assert(parsed.party.occupiedCount() == 0);
+        assert(!parsed.ok);
     }
 
-    // Desktop fixture mount via FsSaveData path (no override env)
+    // BDSP still scaffolds empty boxes without Swish hash
+    {
+        std::vector<uint8_t> fake(4096, 0x11);
+        auto parsed = parseSwitchSave(GameId::BrilliantDiamond, fake);
+        assert(parsed.ok);
+        assert(!parsed.parseImplemented);
+    }
+
+    const auto saveBytes = buildMinimalSvSave();
+
     {
         unsetenv("PKHUB_TITLE_OVERRIDE");
-        std::vector<uint8_t> bytes(8192, 0x22);
-        writeFixture(Scarlet, bytes);
+        writeFixture(Scarlet, saveBytes);
 
         SwitchSaveBackend backend(GameId::Scarlet, Scarlet, {}, SaveAccessMode::FsSaveData);
         auto st = backend.open();
         assert(st.result == SaveOpenResult::Ok);
         assert(backend.boxCount() == 32);
         assert(backend.modeUsed() == SaveAccessMode::FsSaveData);
-        assert(!backend.parseImplemented());
+        assert(backend.parseImplemented());
 
-        // Empty commit should rewrite original bytes
         st = backend.commit();
         assert(st.result == SaveOpenResult::Ok);
-
-        // Occupied Pokémon must refuse serialize until parser exists
-        backend.box(0).slot(0).species = 25;
-        backend.box(0).slot(0).level = 5;
-        st = backend.commit();
-        assert(st.result == SaveOpenResult::IoError);
         backend.close();
     }
 
-    // Title override path
     {
         setenv("PKHUB_TITLE_OVERRIDE", "1", 1);
-        std::vector<uint8_t> bytes(2048, 0x33);
-        writeFixture(Violet, bytes);
+        writeFixture(Violet, saveBytes);
         SwitchSaveBackend backend(GameId::Violet, Violet, {}, SaveAccessMode::TitleOverride);
         auto st = backend.open();
         assert(st.result == SaveOpenResult::Ok);
@@ -90,7 +117,6 @@ int main() {
         unsetenv("PKHUB_TITLE_OVERRIDE");
     }
 
-    // Auto: without override, falls back to fixture FsSaveData
     {
         unsetenv("PKHUB_TITLE_OVERRIDE");
         SwitchSaveBackend backend(GameId::Scarlet, Scarlet, {}, SaveAccessMode::Auto);

@@ -44,6 +44,7 @@ public:
     SaveAccessMode modeUsed() const { return modeUsed_; }
     bool parseImplemented() const { return parseImplemented_; }
     const std::string& lastMountMessage() const { return mountMessage_; }
+    const std::vector<uint8_t>& rawBytes() const { return raw_; }
 
 private:
     GameId game_;

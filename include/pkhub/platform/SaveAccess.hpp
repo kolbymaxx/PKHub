@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace pkhub {
 
@@ -33,5 +34,13 @@ struct SwitchMountRequest {
     SwitchUserId user{};
     std::string saveFileName = "main";
 };
+
+struct SwitchUserInfo {
+    SwitchUserId id{};
+    std::string nickname;
+};
+
+/// Enumerate local Switch users for FsSaveData mounts (empty on desktop).
+std::vector<SwitchUserInfo> listSwitchUsers();
 
 }  // namespace pkhub

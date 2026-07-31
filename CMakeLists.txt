@@ -57,6 +57,9 @@ set(PKHUB_SOURCES
     source/services/TransferService.cpp
     source/backends/switch/SwitchSaveBackend.cpp
     source/backends/switch/SwitchSaveParser.cpp
+    source/backends/switch/SwishCrypto.cpp
+    source/backends/switch/PokeCrypto8.cpp
+    source/backends/switch/Pk8Codec.cpp
     source/backends/switch/UnsupportedSaveBackend.cpp
     source/backends/raw/RawSaveBackend.cpp
     source/backends/raw/gba/GbaGen3.cpp
@@ -78,6 +81,7 @@ add_executable(PKHub ${PKHUB_SOURCES})
 target_include_directories(PKHub PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/libs/json
+    ${CMAKE_SOURCE_DIR}/libs/sha256
 )
 
 target_compile_options(PKHub PRIVATE
@@ -205,38 +209,44 @@ if(PKHUB_BUILD_TESTS)
     target_compile_options(pkhub_gba_writeback PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME gba_writeback COMMAND pkhub_gba_writeback)
 
+    set(PKHUB_SWITCH_CRYPTO_SOURCES
+        source/backends/switch/SwitchSaveBackend.cpp
+        source/backends/switch/SwitchSaveParser.cpp
+        source/backends/switch/SwishCrypto.cpp
+        source/backends/switch/PokeCrypto8.cpp
+        source/backends/switch/Pk8Codec.cpp
+        source/backends/switch/UnsupportedSaveBackend.cpp
+        source/platform/SaveAccess.cpp
+        source/platform/SwitchSaveMount.cpp
+        source/core/pokemon/GameId.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/save/Box.cpp
+        source/core/fs/Paths.cpp
+    )
+
     add_executable(pkhub_emu_scan tests/emu_scan_test.cpp
         source/backends/discovery/SaveDiscovery.cpp
         source/backends/raw/RawSaveBackend.cpp
         source/backends/raw/gba/GbaGen3.cpp
-        source/backends/switch/SwitchSaveBackend.cpp
-        source/backends/switch/SwitchSaveParser.cpp
-        source/backends/switch/UnsupportedSaveBackend.cpp
-        source/core/pokemon/GameId.cpp
-        source/core/pokemon/Pokemon.cpp
-        source/core/save/Box.cpp
-        source/core/fs/Paths.cpp
+        ${PKHUB_SWITCH_CRYPTO_SOURCES}
         source/core/fs/FileBrowser.cpp
-        source/platform/SaveAccess.cpp
-        source/platform/SwitchSaveMount.cpp
     )
-    target_include_directories(pkhub_emu_scan PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(pkhub_emu_scan PRIVATE
+        ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/libs/sha256)
     target_compile_options(pkhub_emu_scan PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME emu_scan COMMAND pkhub_emu_scan)
 
-    add_executable(pkhub_switch_mount tests/switch_mount_test.cpp
-        source/backends/switch/SwitchSaveBackend.cpp
-        source/backends/switch/SwitchSaveParser.cpp
-        source/platform/SaveAccess.cpp
-        source/platform/SwitchSaveMount.cpp
-        source/core/pokemon/GameId.cpp
-        source/core/pokemon/Pokemon.cpp
-        source/core/save/Box.cpp
-        source/core/fs/Paths.cpp
-    )
-    target_include_directories(pkhub_switch_mount PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    add_executable(pkhub_switch_mount tests/switch_mount_test.cpp ${PKHUB_SWITCH_CRYPTO_SOURCES})
+    target_include_directories(pkhub_switch_mount PRIVATE
+        ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/libs/sha256)
     target_compile_options(pkhub_switch_mount PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME switch_mount COMMAND pkhub_switch_mount)
+
+    add_executable(pkhub_swish_roundtrip tests/swish_roundtrip_test.cpp ${PKHUB_SWITCH_CRYPTO_SOURCES})
+    target_include_directories(pkhub_swish_roundtrip PRIVATE
+        ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/libs/sha256)
+    target_compile_options(pkhub_swish_roundtrip PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME swish_roundtrip COMMAND pkhub_swish_roundtrip)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | BorealisUI: ${ENABLE_BOREALIS_UI} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

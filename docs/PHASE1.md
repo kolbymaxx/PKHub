@@ -4,20 +4,28 @@
 
 - XITRIX Borealis submodule at `libs/borealis`
 - Hub persistence: `hub.json` + `.pkbox` (codec round-trip tested)
-- Real backups for raw saves / hub directories; Switch marker JSON stub
-- Clean-room **GBA Gen 3** decode (`parseSave` / `decodeBoxMon` / `encodeBoxMon`)
-- **GBA Gen 3 write-back** (`writeSave` / `encodePartyMon` / `RawSaveBackend::commit`)
+- Real backups for raw saves / hub directories; **Switch `main` byte backup** + marker JSON
+- Clean-room **GBA Gen 3** decode + write-back
 - **RetroArch / emulator save scan** + **file browser** (`.sav` / `.srm` / `.dsv`)
 - Desktop path remap (`sdmc:/…` and `/…` → `./pkhub_data/…` or `$PKHUB_DATA_ROOT`)
-- UI shell (compiled when `-DPKHUB_ENABLE_UI=ON`): home tabs, box grid placeholders, core editor (shiny / level), save button via `SafetyPolicy`
-- **Switch save mount** — title override first, then `fsOpen_SaveData` / user; desktop fixtures under `switch_saves/<titleId>/main`
-- SV/SwSh/etc. **mount + empty box scaffold** (Pokémon decrypt/parse still TODO); Z-A remains stubbed
+- UI shell: home tabs, box grid, **party**, richer editor (shiny / level / nature / ability / IVs / EVs / moves / tera), Save via `SafetyPolicy`
+- **Switch save mount** — title override first, then `fsOpen_SaveData` + **user picker**
+- **SwishCrypto + PK8/PK9 parse/serialize** for Sword/Shield/Scarlet/Violet (empty-box scaffold for BDSP/LA until their formats land)
+- Z-A remains stubbed
 
 ## Build
 
 ```bash
 cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPKHUB_ENABLE_UI=OFF
 cmake --build build/desktop -j && ctest --test-dir build/desktop --output-on-failure
+```
+
+Switch `.nro` (devkitPro):
+
+```bash
+cmake -B build/switch -DPLATFORM_SWITCH=ON -DPLATFORM_DESKTOP=OFF -DPKHUB_ENABLE_UI=ON \
+  -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake"
+cmake --build build/switch -j
 ```
 
 Desktop Switch fixture testing:
@@ -30,7 +38,7 @@ Desktop Switch fixture testing:
 
 ## Still next
 
-- Full SV / SwSh Pokémon decrypt & serialize (SwishCrypto / gen8 crypto)
-- Richer editor fields (moves, nature, ability, EVs/IVs editors)
+- SV national↔internal species converter + name tables
+- BDSP flat-binary + LA PA8 entity parsers
 - NDS / 3DS raw parsers
 - Wire UI against real graphics stack on a desktop with X11/Wayland dev packages

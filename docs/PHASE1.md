@@ -5,11 +5,13 @@
 - XITRIX Borealis submodule at `libs/borealis`
 - Hub persistence: `hub.json` + `.pkbox` (codec round-trip tested)
 - Real backups for raw saves / hub directories; Switch marker JSON stub
-- Clean-room **GBA Gen 3** decode + **write-back**
-- Desktop path remap (`sdmc:/…` → `./pkhub_data/…` or `$PKHUB_DATA_ROOT`)
-- UI shell (compiled when `-DPKHUB_ENABLE_UI=ON`)
+- Clean-room **GBA Gen 3** decode (`parseSave` / `decodeBoxMon` / `encodeBoxMon`)
+- **GBA Gen 3 write-back** (`writeSave` / `encodePartyMon` / `RawSaveBackend::commit`)
+- **RetroArch / emulator save scan** + **file browser** (`.sav` / `.srm` / `.dsv`)
+- Desktop path remap (`sdmc:/…` and `/…` → `./pkhub_data/…` or `$PKHUB_DATA_ROOT`)
+- UI shell (compiled when `-DPKHUB_ENABLE_UI=ON`): home tabs, box grid placeholders, core editor (shiny / level), save button via `SafetyPolicy`
 - **Switch save mount** — title override first, then `fsOpen_SaveData` / user; desktop fixtures under `switch_saves/<titleId>/main`
-- SV/SwSh/etc. **mount + empty box scaffold** (Pokémon decrypt/parse still TODO)
+- SV/SwSh/etc. **mount + empty box scaffold** (Pokémon decrypt/parse still TODO); Z-A remains stubbed
 
 ## Build
 
@@ -28,7 +30,7 @@ Desktop Switch fixture testing:
 
 ## Still next
 
-- RetroArch path scanner + file browser (see open PR if not merged)
 - Full SV / SwSh Pokémon decrypt & serialize (SwishCrypto / gen8 crypto)
 - Richer editor fields (moves, nature, ability, EVs/IVs editors)
 - NDS / 3DS raw parsers
+- Wire UI against real graphics stack on a desktop with X11/Wayland dev packages

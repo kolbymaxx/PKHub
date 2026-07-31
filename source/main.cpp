@@ -19,6 +19,7 @@
 
 #if defined(PKHUB_HAS_BOREALIS)
 #include <borealis.hpp>
+#include "pkhub/ui/activities/FileBrowserActivity.hpp"
 #include "pkhub/ui/activities/MainActivity.hpp"
 #include "pkhub/ui/views/BoxGridView.hpp"
 #include "pkhub/ui/views/PokemonSlotView.hpp"
@@ -69,32 +70,86 @@ static brls::View* buildSwitchGamesTab() {
     return list;
 }
 
+static bool openDetectedRawSave(const DetectedSave& detected) {
+    if (!detected.formatSupported) {
+        brls::Application::notify(detected.unsupportedReason.empty()
+                                      ? "Format not supported yet"
+                                      : detected.unsupportedReason);
+        return true;
+    }
+    RawSaveBackendFactory factory;
+    auto backend = factory.create(detected);
+    auto& ctx = AppContext::instance();
+    auto st = ctx.session().attachBackend(std::move(backend));
+    if (st.result != SaveOpenResult::Ok) {
+        brls::Application::notify(st.message);
+        return true;
+    }
+    brls::Application::pushActivity(new brls::Activity(
+        ui::buildSaveWorkspace(ctx.session().backend(), detected.displayName)));
+    return true;
+}
+
 static brls::View* buildEmuTab() {
     auto* list = new brls::List();
-    auto* openPath = new brls::ListItem("Open raw save path…", "Phase 1: set PKHUB_TEST_SAVE");
-    openPath->registerClickAction([](brls::View*) {
+
+    auto* scan = new brls::ListItem("Scan RetroArch saves", "GBA → DS · common SD paths");
+    scan->registerClickAction([](brls::View*) {
+        auto found = scanRetroArchSaves();
+        if (found.empty()) {
+            brls::Application::notify("No .sav/.srm/.dsv found in default paths");
+            return true;
+        }
+        auto* results = new brls::List();
+        for (const auto& d : found) {
+            auto* item = new brls::ListItem(
+                d.displayName,
+                d.formatHint + (d.formatSupported ? "" : " · unsupported") + " · " + d.path);
+            DetectedSave detected = d;
+            item->registerClickAction([detected](brls::View*) {
+                return openDetectedRawSave(detected);
+            });
+            results->addView(item);
+        }
+        auto* frame = new brls::AppletFrame();
+        frame->setTitle("Detected saves (" + std::to_string(found.size()) + ")");
+        frame->setContentView(results);
+        brls::Application::pushActivity(new brls::Activity(frame));
+        return true;
+    });
+    list->addView(scan);
+
+    auto* browse = new brls::ListItem("Browse files…", "Manual .sav / .dsv / .srm");
+    browse->registerClickAction([](brls::View*) {
+        brls::Application::pushActivity(new brls::Activity(ui::buildFileBrowser(
+            "sdmc:/retroarch/saves", [](const std::string& path) {
+                auto det = detectRawSaveFile(path);
+                if (!det) {
+                    brls::Application::notify("Not a recognized save file");
+                    return;
+                }
+                openDetectedRawSave(*det);
+            })));
+        return true;
+    });
+    list->addView(browse);
+
+    auto* envOpen = new brls::ListItem("Open PKHUB_TEST_SAVE", "Desktop / debug helper");
+    envOpen->registerClickAction([](brls::View*) {
         const char* path = std::getenv("PKHUB_TEST_SAVE");
         if (!path || !*path) {
             brls::Application::notify("Set PKHUB_TEST_SAVE to a .sav/.srm file");
             return true;
         }
-        DetectedSave d;
-        d.path = path;
-        d.displayName = path;
-        RawSaveBackendFactory factory;
-        auto backend = factory.create(d);
-        auto& ctx = AppContext::instance();
-        auto st = ctx.session().attachBackend(std::move(backend));
-        if (st.result != SaveOpenResult::Ok) {
-            brls::Application::notify(st.message);
+        auto det = detectRawSaveFile(path);
+        if (!det) {
+            brls::Application::notify("Invalid or missing test save");
             return true;
         }
-        brls::Application::pushActivity(new brls::Activity(
-            ui::buildSaveWorkspace(ctx.session().backend(), path)));
-        return true;
+        return openDetectedRawSave(*det);
     });
-    list->addView(openPath);
-    list->addView(new brls::ListItem("RetroArch scan", "Coming next"));
+    list->addView(envOpen);
+
     return list;
 }
 
@@ -152,6 +207,9 @@ int runHeadlessSmoke() {
 
     auto za = pkhub::makeLegendsZAStub();
     std::printf("Z-A: %s\n", za->open().message.c_str());
+
+    auto emu = pkhub::scanRetroArchSaves();
+    std::printf("Emulator saves scanned: %zu\n", emu.size());
 
     pkhub::SafetyPolicy safety;
     auto soft = safety.evaluate(pkhub::SafetyAction::InjectLikelyIllegal);

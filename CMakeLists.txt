@@ -56,11 +56,13 @@ set(PKHUB_SOURCES
     source/core/fs/FileBrowser.cpp
     source/services/TransferService.cpp
     source/backends/switch/SwitchSaveBackend.cpp
+    source/backends/switch/SwitchSaveParser.cpp
     source/backends/switch/UnsupportedSaveBackend.cpp
     source/backends/raw/RawSaveBackend.cpp
     source/backends/raw/gba/GbaGen3.cpp
     source/backends/discovery/SaveDiscovery.cpp
     source/platform/SaveAccess.cpp
+    source/platform/SwitchSaveMount.cpp
     source/ui/UiBootstrap.cpp
     source/ui/SpritePlaceholder.cpp
     source/ui/views/PokemonSlotView.cpp
@@ -208,6 +210,7 @@ if(PKHUB_BUILD_TESTS)
         source/backends/raw/RawSaveBackend.cpp
         source/backends/raw/gba/GbaGen3.cpp
         source/backends/switch/SwitchSaveBackend.cpp
+        source/backends/switch/SwitchSaveParser.cpp
         source/backends/switch/UnsupportedSaveBackend.cpp
         source/core/pokemon/GameId.cpp
         source/core/pokemon/Pokemon.cpp
@@ -215,10 +218,25 @@ if(PKHUB_BUILD_TESTS)
         source/core/fs/Paths.cpp
         source/core/fs/FileBrowser.cpp
         source/platform/SaveAccess.cpp
+        source/platform/SwitchSaveMount.cpp
     )
     target_include_directories(pkhub_emu_scan PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_compile_options(pkhub_emu_scan PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME emu_scan COMMAND pkhub_emu_scan)
+
+    add_executable(pkhub_switch_mount tests/switch_mount_test.cpp
+        source/backends/switch/SwitchSaveBackend.cpp
+        source/backends/switch/SwitchSaveParser.cpp
+        source/platform/SaveAccess.cpp
+        source/platform/SwitchSaveMount.cpp
+        source/core/pokemon/GameId.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/save/Box.cpp
+        source/core/fs/Paths.cpp
+    )
+    target_include_directories(pkhub_switch_mount PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_options(pkhub_switch_mount PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME switch_mount COMMAND pkhub_switch_mount)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | BorealisUI: ${ENABLE_BOREALIS_UI} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

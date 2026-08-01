@@ -45,6 +45,7 @@ set(PKHUB_SOURCES
     source/app/AppContext.cpp
     source/core/pokemon/GameId.cpp
     source/core/pokemon/Pokemon.cpp
+    source/core/pokemon/SpeciesIds.cpp
     source/core/save/Box.cpp
     source/core/save/SaveSession.cpp
     source/core/hub/HubStorage.cpp
@@ -68,6 +69,7 @@ set(PKHUB_SOURCES
     source/platform/SwitchSaveMount.cpp
     source/ui/UiBootstrap.cpp
     source/ui/SpritePlaceholder.cpp
+    source/ui/SpriteService.cpp
     source/ui/views/PokemonSlotView.cpp
     source/ui/views/BoxGridView.cpp
     source/ui/activities/MainActivity.cpp
@@ -89,9 +91,27 @@ target_compile_options(PKHub PRIVATE
     -fexceptions -frtti
 )
 
+if(PLATFORM_SWITCH AND DEFINED ENV{DEVKITPRO})
+    # Apply before Borealis so GLFW/EGL resolve; -isystem avoids tinyxml2 clashes.
+    add_compile_options(
+        "-isystem$ENV{DEVKITPRO}/portlibs/switch/include"
+        "-isystem$ENV{DEVKITPRO}/libnx/include")
+    link_directories(
+        "$ENV{DEVKITPRO}/portlibs/switch/lib"
+        "$ENV{DEVKITPRO}/libnx/lib")
+endif()
+
 if(HAVE_BOREALIS)
     message(STATUS "Borealis present — attempting UI link")
     set(BRLS_RESOURCES_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING "" FORCE)
+    # Borealis set_target_properties requires an explicit UNITY_BUILD value.
+    if(NOT DEFINED BRLS_UNITY_BUILD)
+        set(BRLS_UNITY_BUILD OFF CACHE BOOL "" FORCE)
+    endif()
+    # fmt os.cc uses POSIX APIs unavailable on Switch newlib.
+    if(PLATFORM_SWITCH)
+        set(FMT_OS OFF CACHE BOOL "" FORCE)
+    endif()
     add_subdirectory(${BOREALIS_LIBRARY} EXCLUDE_FROM_ALL)
     if(TARGET borealis)
         target_compile_definitions(PKHub PRIVATE PKHUB_HAS_BOREALIS=1)
@@ -123,9 +143,11 @@ endif()
 
 if(PLATFORM_SWITCH)
     target_compile_definitions(PKHub PRIVATE __SWITCH__=1 PLATFORM_SWITCH=1)
-    list(APPEND PKHUB_SOURCES ${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c)
+    if(EXISTS "${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c")
+        target_sources(PKHub PRIVATE ${BOREALIS_LIBRARY}/lib/platforms/switch/switch_wrapper.c)
+    endif()
     if(DEFINED ENV{DEVKITPRO})
-        find_library(NX_LIB nx)
+        find_library(NX_LIB nx HINTS "$ENV{DEVKITPRO}/libnx/lib")
         if(NX_LIB)
             set(SWITCH_LIBS nx m)
             if(ENABLE_BOREALIS_UI)
@@ -136,17 +158,19 @@ if(PLATFORM_SWITCH)
         find_program(NX_ELF2NRO elf2nro HINTS "$ENV{DEVKITPRO}/tools/bin" /opt/devkitpro/tools/bin)
         find_program(NX_NACPTOOL nacptool HINTS "$ENV{DEVKITPRO}/tools/bin" /opt/devkitpro/tools/bin)
         if(NX_ELF2NRO AND NX_NACPTOOL)
+            # Single shell step avoids generator-expression / quoting issues with nacptool.
             add_custom_command(TARGET PKHub POST_BUILD
-                COMMAND ${NX_NACPTOOL} --create "PKHub" "${PKHUB_AUTHOR}"
-                        "${PROJECT_VERSION}" "$<TARGET_FILE_DIR:PKHub>/PKHub.nacp"
-                        --titleid=${PKHUB_TITLEID}
-                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:PKHub>/romfs"
-                COMMAND ${CMAKE_COMMAND} -E copy_directory
-                        "${CMAKE_SOURCE_DIR}/resources" "$<TARGET_FILE_DIR:PKHub>/romfs"
-                COMMAND ${NX_ELF2NRO} "$<TARGET_FILE:PKHub>"
-                        "$<TARGET_FILE_DIR:PKHub>/PKHub.nro"
-                        --nacp="$<TARGET_FILE_DIR:PKHub>/PKHub.nacp"
-                        --romfsdir="$<TARGET_FILE_DIR:PKHub>/romfs"
+                COMMAND ${CMAKE_COMMAND} -E env
+                        "NX_NACPTOOL=${NX_NACPTOOL}"
+                        "NX_ELF2NRO=${NX_ELF2NRO}"
+                        "PKHUB_AUTHOR=${PKHUB_AUTHOR}"
+                        "PKHUB_VERSION=${PROJECT_VERSION}"
+                        "PKHUB_TITLEID=${PKHUB_TITLEID}"
+                        "PKHUB_RESOURCES=${CMAKE_SOURCE_DIR}/resources"
+                        "BOREALIS_RESOURCES=${BOREALIS_PATH}/resources"
+                        "OUT_DIR=$<TARGET_FILE_DIR:PKHub>"
+                        "ELF_PATH=$<TARGET_FILE:PKHub>"
+                        bash "${CMAKE_SOURCE_DIR}/scripts/package_nro.sh"
                 COMMENT "Packaging PKHub.nro"
                 VERBATIM
             )
@@ -156,7 +180,7 @@ if(PLATFORM_SWITCH)
     endif()
 endif()
 
-if(PKHUB_BUILD_TESTS)
+if(PKHUB_BUILD_TESTS AND NOT PLATFORM_SWITCH)
     enable_testing()
     set(PKHUB_TEST_COMMON
         source/core/pokemon/GameId.cpp
@@ -247,6 +271,14 @@ if(PKHUB_BUILD_TESTS)
         ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/libs/sha256)
     target_compile_options(pkhub_swish_roundtrip PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME swish_roundtrip COMMAND pkhub_swish_roundtrip)
+
+    add_executable(pkhub_species_ids tests/species_ids_test.cpp
+        source/core/pokemon/SpeciesIds.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/pokemon/GameId.cpp)
+    target_include_directories(pkhub_species_ids PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_options(pkhub_species_ids PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME species_ids COMMAND pkhub_species_ids)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | BorealisUI: ${ENABLE_BOREALIS_UI} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

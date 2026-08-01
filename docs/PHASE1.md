@@ -38,7 +38,8 @@ Desktop Switch fixture testing:
 
 ## Still next
 
-- SV national↔internal species converter + name tables
+- Species name tables (National Dex labels beyond `#nnn`)
+- BDSP / Legends Arceus parsers beyond scaffold
 - BDSP flat-binary + LA PA8 entity parsers
 - NDS / 3DS raw parsers
 - Wire UI against real graphics stack on a desktop with X11/Wayland dev packages

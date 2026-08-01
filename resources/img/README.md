@@ -1,10 +1,11 @@
-# Assets
+# Image assets
 
-Place pack contents here:
+## Pokémon sprites (`pokemon/`, `pokemon/shiny/`)
 
-- `sprites/` — Pokémon box sprites (indexed by species/form)
-- `types/` — type icons
-- `icons/` — app UI icons
+Front sprites for National Dex `#1`–`#1025`, normal and shiny.
 
-Phase 1 may ship placeholders; do not commit ripped copyrighted sprite sheets
-without a clear redistribution plan.
+- **Source:** [PokeAPI sprites](https://github.com/PokeAPI/sprites) (community-packaged game assets)
+- **License / use:** Follow PokeAPI sprite project terms; Pokémon is © Nintendo / Creatures Inc. / GAME FREAK.
+- **Lookup:** Filenames are National Dex IDs. Scarlet/Violet ROM internal IDs are remapped via `SpeciesIds` before load.
+
+Do not commit ripped console dumps outside this documented pack.

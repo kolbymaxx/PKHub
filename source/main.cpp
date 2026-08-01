@@ -20,6 +20,8 @@
 
 #if defined(PKHUB_HAS_BOREALIS)
 #include <borealis.hpp>
+#include <borealis/views/cells/cell_detail.hpp>
+#include "pkhub/ui/UiList.hpp"
 #include "pkhub/ui/activities/FileBrowserActivity.hpp"
 #include "pkhub/ui/activities/MainActivity.hpp"
 #include "pkhub/ui/views/BoxGridView.hpp"
@@ -34,6 +36,10 @@ constexpr const char* kAppVersion = "0.1.0-dev";
 #if defined(PKHUB_HAS_BOREALIS)
 
 using namespace pkhub;
+using pkhub::ui::addClickableDetail;
+using pkhub::ui::makeAppletFrame;
+using pkhub::ui::makeScrollList;
+using pkhub::ui::makeSectionHeader;
 
 static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId& user) {
     auto& ctx = AppContext::instance();
@@ -56,56 +62,62 @@ static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId&
 }
 
 static brls::View* buildSwitchGamesTab() {
-    auto* list = new brls::List();
-    list->addView(new brls::ListItem(
-        "Title override tip",
-        "Hold R while launching the game, then open PKHub for reliable save access"));
+    auto list = makeScrollList();
+    list.content->addView(makeSectionHeader("Tips"));
+    addClickableDetail(list.content, "Title override",
+                       "Hold R while launching the game, then open PKHub",
+                       [](brls::View*) {
+                           brls::Application::notify(
+                               "Hold R on game launch for reliable save access");
+                           return true;
+                       });
 
     auto users = listSwitchUsers();
     if (!users.empty()) {
-        list->addView(new brls::ListItem("Users found", std::to_string(users.size())));
+        addClickableDetail(list.content, "Users found", std::to_string(users.size()),
+                           nullptr);
     }
 
+    list.content->addView(makeSectionHeader("Games"));
     for (const auto& d : scanKnownSwitchTitles()) {
-        auto* item = new brls::ListItem(
-            d.displayName,
+        const std::string detail =
             d.formatSupported
                 ? (std::string("Official save · ") +
                    (SwitchSaveMount::isTitleOverrideFor(d.titleId) ? "override active"
                                                                    : "auto mount"))
-                : "Format not yet documented");
+                : "Format not yet documented";
         DetectedSave detected = d;
-        item->registerClickAction([detected, users](brls::View*) {
-            if (users.size() <= 1) {
-                SwitchUserId uid = users.empty() ? SwitchUserId{} : users[0].id;
-                return openSwitchDetected(detected, uid);
-            }
-            auto* picker = new brls::List();
-            for (const auto& u : users) {
-                auto* ui = new brls::ListItem(u.nickname.empty() ? "User" : u.nickname,
-                                              "FsSaveData mount with this profile");
-                DetectedSave det = detected;
-                SwitchUserId uid = u.id;
-                ui->registerClickAction([det, uid](brls::View*) {
-                    return openSwitchDetected(det, uid);
-                });
-                picker->addView(ui);
-            }
-            auto* overrideItem = new brls::ListItem("Use title override / preselected",
-                                                    "No explicit user id");
-            overrideItem->registerClickAction([detected](brls::View*) {
-                return openSwitchDetected(detected, {});
-            });
-            picker->addView(overrideItem);
-            auto* frame = new brls::AppletFrame();
-            frame->setTitle("Choose user — " + detected.displayName);
-            frame->setContentView(picker);
-            brls::Application::pushActivity(new brls::Activity(frame));
-            return true;
-        });
-        list->addView(item);
+        addClickableDetail(list.content, d.displayName, detail,
+                           [detected, users](brls::View*) {
+                               if (users.size() <= 1) {
+                                   SwitchUserId uid =
+                                       users.empty() ? SwitchUserId{} : users[0].id;
+                                   return openSwitchDetected(detected, uid);
+                               }
+                               auto picker = makeScrollList();
+                               picker.content->addView(makeSectionHeader("Profile"));
+                               for (const auto& u : users) {
+                                   DetectedSave det = detected;
+                                   SwitchUserId uid = u.id;
+                                   addClickableDetail(
+                                       picker.content,
+                                       u.nickname.empty() ? "User" : u.nickname,
+                                       "FsSaveData mount with this profile",
+                                       [det, uid](brls::View*) {
+                                           return openSwitchDetected(det, uid);
+                                       });
+                               }
+                               addClickableDetail(
+                                   picker.content, "Use title override / preselected",
+                                   "No explicit user id", [detected](brls::View*) {
+                                       return openSwitchDetected(detected, {});
+                                   });
+                               auto* frame = makeAppletFrame("Choose user — " + detected.displayName, picker.scroll);
+                               brls::Application::pushActivity(new brls::Activity(frame));
+                               return true;
+                           });
     }
-    return list;
+    return list.scroll;
 }
 
 static bool openDetectedRawSave(const DetectedSave& detected) {
@@ -129,79 +141,84 @@ static bool openDetectedRawSave(const DetectedSave& detected) {
 }
 
 static brls::View* buildEmuTab() {
-    auto* list = new brls::List();
+    auto list = makeScrollList();
+    list.content->addView(makeSectionHeader("Emulator saves"));
 
-    auto* scan = new brls::ListItem("Scan RetroArch saves", "GBA → DS · common SD paths");
-    scan->registerClickAction([](brls::View*) {
-        auto found = scanRetroArchSaves();
-        if (found.empty()) {
-            brls::Application::notify("No .sav/.srm/.dsv found in default paths");
+    addClickableDetail(
+        list.content, "Scan RetroArch saves", "GBA → DS · common SD paths",
+        [](brls::View*) {
+            auto found = scanRetroArchSaves();
+            if (found.empty()) {
+                brls::Application::notify("No .sav/.srm/.dsv found in default paths");
+                return true;
+            }
+            auto results = makeScrollList();
+            results.content->addView(makeSectionHeader("Detected"));
+            for (const auto& d : found) {
+                DetectedSave detected = d;
+                addClickableDetail(
+                    results.content, d.displayName,
+                    d.formatHint + (d.formatSupported ? "" : " · unsupported") + " · " +
+                        d.path,
+                    [detected](brls::View*) { return openDetectedRawSave(detected); });
+            }
+            auto* frame = makeAppletFrame("Detected saves (" + std::to_string(found.size()) + ")", results.scroll);
+            brls::Application::pushActivity(new brls::Activity(frame));
             return true;
-        }
-        auto* results = new brls::List();
-        for (const auto& d : found) {
-            auto* item = new brls::ListItem(
-                d.displayName,
-                d.formatHint + (d.formatSupported ? "" : " · unsupported") + " · " + d.path);
-            DetectedSave detected = d;
-            item->registerClickAction([detected](brls::View*) {
-                return openDetectedRawSave(detected);
-            });
-            results->addView(item);
-        }
-        auto* frame = new brls::AppletFrame();
-        frame->setTitle("Detected saves (" + std::to_string(found.size()) + ")");
-        frame->setContentView(results);
-        brls::Application::pushActivity(new brls::Activity(frame));
-        return true;
-    });
-    list->addView(scan);
+        });
 
-    auto* browse = new brls::ListItem("Browse files…", "Manual .sav / .dsv / .srm");
-    browse->registerClickAction([](brls::View*) {
-        brls::Application::pushActivity(new brls::Activity(ui::buildFileBrowser(
-            "sdmc:/retroarch/saves", [](const std::string& path) {
-                auto det = detectRawSaveFile(path);
-                if (!det) {
-                    brls::Application::notify("Not a recognized save file");
-                    return;
-                }
-                openDetectedRawSave(*det);
-            })));
-        return true;
-    });
-    list->addView(browse);
+    addClickableDetail(list.content, "Browse files…", "Manual .sav / .dsv / .srm",
+                       [](brls::View*) {
+                           brls::Application::pushActivity(new brls::Activity(
+                               ui::buildFileBrowser("sdmc:/retroarch/saves",
+                                                    [](const std::string& path) {
+                                                        auto det = detectRawSaveFile(path);
+                                                        if (!det) {
+                                                            brls::Application::notify(
+                                                                "Not a recognized save file");
+                                                            return;
+                                                        }
+                                                        openDetectedRawSave(*det);
+                                                    })));
+                           return true;
+                       });
 
-    auto* envOpen = new brls::ListItem("Open PKHUB_TEST_SAVE", "Desktop / debug helper");
-    envOpen->registerClickAction([](brls::View*) {
-        const char* path = std::getenv("PKHUB_TEST_SAVE");
-        if (!path || !*path) {
-            brls::Application::notify("Set PKHUB_TEST_SAVE to a .sav/.srm file");
-            return true;
-        }
-        auto det = detectRawSaveFile(path);
-        if (!det) {
-            brls::Application::notify("Invalid or missing test save");
-            return true;
-        }
-        return openDetectedRawSave(*det);
-    });
-    list->addView(envOpen);
+    addClickableDetail(list.content, "Open PKHUB_TEST_SAVE", "Desktop / debug helper",
+                       [](brls::View*) {
+                           const char* path = std::getenv("PKHUB_TEST_SAVE");
+                           if (!path || !*path) {
+                               brls::Application::notify(
+                                   "Set PKHUB_TEST_SAVE to a .sav/.srm file");
+                               return true;
+                           }
+                           auto det = detectRawSaveFile(path);
+                           if (!det) {
+                               brls::Application::notify("Invalid or missing test save");
+                               return true;
+                           }
+                           return openDetectedRawSave(*det);
+                       });
 
-    return list;
+    return list.scroll;
 }
 
 static brls::View* buildHubTab() {
-    auto* list = new brls::List();
-    auto* open = new brls::ListItem("Open Hub Storage", "Persistent multi-gen boxes");
-    open->registerClickAction([](brls::View*) {
-        auto& ctx = AppContext::instance();
-        brls::Application::pushActivity(new brls::Activity(
-            ui::buildSaveWorkspace(&ctx.hub(), "Hub Storage")));
-        return true;
-    });
-    list->addView(open);
-    return list;
+    auto list = makeScrollList();
+    list.content->addView(makeSectionHeader("Hub"));
+    addClickableDetail(list.content, "Open Hub Storage", "Persistent multi-gen boxes",
+                       [](brls::View*) {
+                           auto& ctx = AppContext::instance();
+                           brls::Application::pushActivity(new brls::Activity(
+                               ui::buildSaveWorkspace(&ctx.hub(), "Hub Storage")));
+                           return true;
+                       });
+    addClickableDetail(list.content, "About PKHub",
+                       std::string(kAppVersion) + " · soft legality · clean-room formats",
+                       [](brls::View*) {
+                           brls::Application::notify("PKHub — multi-gen save editor");
+                           return true;
+                       });
+    return list.scroll;
 }
 
 int runBorealisUi() {
@@ -214,10 +231,10 @@ int runBorealisUi() {
     brls::Application::createWindow(std::string(kAppName) + " " + kAppVersion);
 
     auto* root = new brls::TabFrame();
-    root->setTitle(kAppName);
-    root->addTab("Switch Games", buildSwitchGamesTab());
-    root->addTab("Emulator Saves", buildEmuTab());
-    root->addTab("Hub Storage", buildHubTab());
+    root->getAppletFrameItem()->title = kAppName;
+    root->addTab("Switch Games", []() { return buildSwitchGamesTab(); });
+    root->addTab("Emulator Saves", []() { return buildEmuTab(); });
+    root->addTab("Hub Storage", []() { return buildHubTab(); });
 
     brls::Application::pushActivity(new brls::Activity(root));
 

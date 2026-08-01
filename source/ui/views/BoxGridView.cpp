@@ -8,16 +8,25 @@ namespace pkhub::ui {
 
 BoxGridView::BoxGridView() {
     setAxis(brls::Axis::COLUMN);
-    setPadding(20);
+    setPadding(18);
     setGrow(1.f);
+    setBackgroundColor(nvgRGBA(12, 18, 22, 0));
 
     title_ = new brls::Label();
-    title_->setFontSize(22);
+    title_->setFontSize(26);
+    title_->setTextColor(nvgRGB(230, 240, 235));
     title_->setText("Box");
     addView(title_);
 
+    auto* subtitle = new brls::Label();
+    subtitle->setFontSize(14);
+    subtitle->setTextColor(nvgRGBA(150, 180, 165, 220));
+    subtitle->setText("Tap a slot to edit");
+    addView(subtitle);
+
     grid_ = new brls::Box(brls::Axis::COLUMN);
     grid_->setGrow(1.f);
+    grid_->setPaddingTop(10);
     addView(grid_);
 }
 
@@ -48,9 +57,12 @@ void BoxGridView::refresh() {
         return;
     }
 
-    const Box& box = static_cast<const IBoxProvider*>(provider_)->box(boxIndex_);
+    // Qualify: BoxGridView inherits brls::Box, so bare `Box` resolves to the UI base.
+    const pkhub::Box& box = provider_->box(boxIndex_);
     if (title_) {
-        title_->setText(box.name().empty() ? ("Box " + std::to_string(boxIndex_ + 1)) : box.name());
+        const std::string name =
+            box.name().empty() ? ("Box " + std::to_string(boxIndex_ + 1)) : box.name();
+        title_->setText(name + "  ·  " + std::to_string(box.occupiedCount()) + " Pokémon");
     }
 
     constexpr int kCols = 6;
@@ -58,7 +70,8 @@ void BoxGridView::refresh() {
     for (std::size_t i = 0; i < box.size(); ++i) {
         if (i % kCols == 0) {
             row = new brls::Box(brls::Axis::ROW);
-            row->setPaddingTop(8);
+            row->setPaddingTop(6);
+            row->setPaddingRight(4);
             grid_->addView(row);
         }
         auto* slot = new PokemonSlotView();

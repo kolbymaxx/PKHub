@@ -47,11 +47,22 @@ git submodule update --init --recursive
 
 ## Switch build
 
+With DevKitPro installed locally:
+
 ```bash
 cmake -B build/switch -DPLATFORM_SWITCH=ON -DPLATFORM_DESKTOP=OFF \
+  -DPKHUB_ENABLE_UI=ON -DBRLS_UNITY_BUILD=OFF -DFMT_OS=OFF \
   -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake"
 cmake --build build/switch -j
 ```
+
+Or via Docker (recommended in CI / cloud agents):
+
+```bash
+./scripts/build_switch_nro.sh   # → build/switch/PKHub.nro
+```
+
+RomFS includes National Dex sprites (`resources/img/pokemon/` + shiny) and Borealis assets.
 
 Prefer **title override** when editing official saves; `fsOpen_SaveData` + user picker is supported for SwSh/SV.
 

@@ -1,0 +1,14 @@
+--- a/library/lib/platforms/switch/switch_input.cpp
++++ b/library/lib/platforms/switch/switch_input.cpp
+@@ -106,7 +106,10 @@ static const size_t SWITCH_AXIS_MAPPING[_AXES_MAX] = {
+ 
+ SwitchInputManager::SwitchInputManager()
+ {
+-    this->screenshot_button_thread = std::jthread(&SwitchInputManager::screenshot_button_thread_fn, this);
++    // GCC 15 / libstdc++: prefer stop_token lambda over PMF+this jthread ctor.
++    this->screenshot_button_thread = std::jthread([this](std::stop_token token) {
++        this->screenshot_button_thread_fn(token);
++    });
+ 
+     padConfigureInput(GAMEPADS_MAX, HidNpadStyleSet_NpadStandard);
+     hidSetNpadJoyHoldType(HidNpadJoyHoldType_Horizontal);

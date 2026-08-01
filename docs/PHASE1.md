@@ -11,6 +11,9 @@
 - UI shell: home tabs, box grid, **party**, richer editor (shiny / level / nature / ability / IVs / EVs / moves / tera), Save via `SafetyPolicy`
 - **Switch save mount** — title override first, then `fsOpen_SaveData` + **user picker**
 - **SwishCrypto + PK8/PK9 parse/serialize** for Sword/Shield/Scarlet/Violet (empty-box scaffold for BDSP/LA until their formats land)
+- **National Dex sprites** (normal + shiny `#1`–`#1025`) + SV internal→national remap (`SpeciesIds` / `SpriteService`)
+- Polished Borealis UI (teal night theme, DetailCell lists, box/party/editor sprite slots)
+- Switch `.nro` packaging via `scripts/build_switch_nro.sh` (Docker DevKitPro)
 - Z-A remains stubbed
 
 ## Build
@@ -20,12 +23,11 @@ cmake -B build/desktop -DPLATFORM_DESKTOP=ON -DPKHUB_ENABLE_UI=OFF
 cmake --build build/desktop -j && ctest --test-dir build/desktop --output-on-failure
 ```
 
-Switch `.nro` (devkitPro):
+Switch `.nro` (Docker / DevKitPro):
 
 ```bash
-cmake -B build/switch -DPLATFORM_SWITCH=ON -DPLATFORM_DESKTOP=OFF -DPKHUB_ENABLE_UI=ON \
-  -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake"
-cmake --build build/switch -j
+./scripts/build_switch_nro.sh
+# → build/switch/PKHub.nro
 ```
 
 Desktop Switch fixture testing:

@@ -1,7 +1,9 @@
 #include "pkhub/ui/activities/MainActivity.hpp"
 
 #include "pkhub/app/AppContext.hpp"
+#include "pkhub/core/pokemon/NatureNames.hpp"
 #include "pkhub/core/pokemon/SpeciesIds.hpp"
+#include "pkhub/core/pokemon/SpeciesNames.hpp"
 #include "pkhub/core/safety/LegalityService.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
 #include "pkhub/ui/SpriteService.hpp"
@@ -75,7 +77,7 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
             const auto& mon = provider->party().slot(i);
             const std::string detail =
                 mon.empty() ? "Empty"
-                            : (SpriteService::displayLabel(mon) + "  Lv" +
+                            : (pokemonDisplayName(mon) + "  Lv" +
                                std::to_string(mon.level) +
                                (mon.isShiny ? "  ✦" : ""));
             addClickableDetail(list.content, "Slot " + std::to_string(i + 1), detail,
@@ -144,22 +146,34 @@ brls::View* buildEditor(IBoxProvider* provider,
         auto* name = new brls::Label();
         name->setFontSize(24);
         name->setTextColor(nvgRGB(235, 245, 240));
-        name->setText(SpriteService::displayLabel(*mon) +
-                      (mon->isShiny ? "  ✦" : ""));
+        name->setText(pokemonDisplayName(*mon) + (mon->isShiny ? "  ✦" : ""));
         meta->addView(name);
         auto* sub = new brls::Label();
         sub->setFontSize(14);
         sub->setTextColor(nvgRGBA(150, 180, 165, 230));
-        sub->setText("Lv " + std::to_string(mon->level) + "  ·  species " +
-                     std::to_string(mon->species) +
-                     (mon->nativeGeneration == Generation::Gen9 ? " (SV internal)" : ""));
+        {
+            const uint16_t nat = nationalDexId(*mon);
+            const char* speciesName = speciesEnglishName(nat);
+            std::string line = "Lv " + std::to_string(mon->level) + "  ·  #" +
+                               std::to_string(nat);
+            if (speciesName && *speciesName) {
+                line += " ";
+                line += speciesName;
+            }
+            if (mon->nativeGeneration == Generation::Gen9) {
+                line += "  ·  SV#" + std::to_string(mon->species);
+            }
+            sub->setText(line);
+        }
         meta->addView(sub);
         hero->addView(meta);
         list.content->addView(hero);
 
         list.content->addView(makeSectionHeader("Identity"));
-        addClickableDetail(list.content, "National Dex",
-                           std::to_string(nationalDexId(*mon)), nullptr);
+        addClickableDetail(list.content, "Species",
+                           std::string(speciesEnglishName(nationalDexId(*mon))) + " (#" +
+                               std::to_string(nationalDexId(*mon)) + ")",
+                           nullptr);
 
         auto* shiny = new brls::BooleanCell();
         shiny->init("Shiny", mon->isShiny, [mon](bool on) { mon->isShiny = on; });
@@ -173,11 +187,18 @@ brls::View* buildEditor(IBoxProvider* provider,
         });
         list.content->addView(level);
 
-        auto* nature = makeDetailCell("Nature", std::to_string(mon->nature));
-        nature->registerClickAction([mon, nature](brls::View*) {
+        auto natureLabel = [](const Pokemon& m) -> std::string {
+            const char* n = natureEnglishName(m.nature);
+            if (n && *n) {
+                return n;
+            }
+            return std::to_string(m.nature);
+        };
+        auto* nature = makeDetailCell("Nature", natureLabel(*mon));
+        nature->registerClickAction([mon, nature, natureLabel](brls::View*) {
             const int n = ((mon->nature < 0 ? 0 : int(mon->nature)) + 1) % 25;
             mon->nature = int8_t(n);
-            nature->setDetailText(std::to_string(mon->nature));
+            nature->setDetailText(natureLabel(*mon));
             return true;
         });
         list.content->addView(nature);

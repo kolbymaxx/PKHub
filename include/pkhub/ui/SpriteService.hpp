@@ -19,7 +19,7 @@ public:
     static std::string spritePath(const Pokemon& mon);
     static std::string spritePath(uint16_t national, bool shiny);
 
-    /// Short display label for UI (species number until name tables land).
+    /// Short display label for UI (nickname or English species; truncated for slots).
     static std::string displayLabel(const Pokemon& mon);
 };
 

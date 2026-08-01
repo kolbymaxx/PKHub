@@ -46,6 +46,8 @@ set(PKHUB_SOURCES
     source/core/pokemon/GameId.cpp
     source/core/pokemon/Pokemon.cpp
     source/core/pokemon/SpeciesIds.cpp
+    source/core/pokemon/SpeciesNames.cpp
+    source/core/pokemon/NatureNames.cpp
     source/core/save/Box.cpp
     source/core/save/SaveSession.cpp
     source/core/hub/HubStorage.cpp
@@ -279,6 +281,16 @@ if(PKHUB_BUILD_TESTS AND NOT PLATFORM_SWITCH)
     target_include_directories(pkhub_species_ids PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_compile_options(pkhub_species_ids PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME species_ids COMMAND pkhub_species_ids)
+
+    add_executable(pkhub_species_names tests/species_names_test.cpp
+        source/core/pokemon/SpeciesNames.cpp
+        source/core/pokemon/SpeciesIds.cpp
+        source/core/pokemon/NatureNames.cpp
+        source/core/pokemon/Pokemon.cpp
+        source/core/pokemon/GameId.cpp)
+    target_include_directories(pkhub_species_names PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_compile_options(pkhub_species_names PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
+    add_test(NAME species_names COMMAND pkhub_species_names)
 endif()
 
 message(STATUS "PKHub ${PROJECT_VERSION} | BorealisUI: ${ENABLE_BOREALIS_UI} | SWITCH: ${PLATFORM_SWITCH} | DESKTOP: ${PLATFORM_DESKTOP}")

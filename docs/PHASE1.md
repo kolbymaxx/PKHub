@@ -12,6 +12,7 @@
 - **Switch save mount** — title override first, then `fsOpen_SaveData` + **user picker**
 - **SwishCrypto + PK8/PK9 parse/serialize** for Sword/Shield/Scarlet/Violet (empty-box scaffold for BDSP/LA until their formats land)
 - **National Dex sprites** (normal + shiny `#1`–`#1025`) + SV internal→national remap (`SpeciesIds` / `SpriteService`)
+- **English species + nature name tables** (PokeAPI / official nature order) in box, party, editor
 - Polished Borealis UI (teal night theme, DetailCell lists, box/party/editor sprite slots)
 - Switch `.nro` packaging via `scripts/build_switch_nro.sh` (Docker DevKitPro)
 - Z-A remains stubbed
@@ -40,8 +41,7 @@ Desktop Switch fixture testing:
 
 ## Still next
 
-- Species name tables (National Dex labels beyond `#nnn`)
-- BDSP / Legends Arceus parsers beyond scaffold
-- BDSP flat-binary + LA PA8 entity parsers
+- BDSP / Legends Arceus entity parsers (see [FORMATS_BDSP_LA.md](FORMATS_BDSP_LA.md))
+- Move / ability English name tables
 - NDS / 3DS raw parsers
 - Wire UI against real graphics stack on a desktop with X11/Wayland dev packages

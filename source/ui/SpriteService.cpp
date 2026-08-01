@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "pkhub/core/pokemon/SpeciesIds.hpp"
+#include "pkhub/core/pokemon/SpeciesNames.hpp"
 
 namespace pkhub {
 
@@ -39,9 +40,13 @@ std::string SpriteService::displayLabel(const Pokemon& mon) {
     if (mon.empty()) {
         return {};
     }
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "#%u", unsigned(nationalId(mon)));
-    return buf;
+    std::string name = pokemonDisplayName(mon);
+    // Box slots are narrow — keep labels short.
+    if (name.size() > 10) {
+        name.resize(9);
+        name += "...";
+    }
+    return name;
 }
 
 }  // namespace pkhub

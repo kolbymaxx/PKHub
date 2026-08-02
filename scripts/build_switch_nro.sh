@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # Build PKHub.nro inside the official DevKitPro Docker image.
+# Always bumps the build number unless PKHUB_SKIP_BUMP=1.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 IMAGE="${PKHUB_DKP_IMAGE:-devkitpro/devkita64:latest}"
+
+if [[ "${PKHUB_SKIP_BUMP:-0}" != "1" ]]; then
+  echo "Incrementing build number…"
+  "$ROOT/scripts/bump_build.sh"
+fi
+
+LABEL="$(sed -n 's/^constexpr const char\* kAppVersion = "\([^"]*\)";$/\1/p' "$ROOT/include/pkhub/app/Version.hpp")"
+echo "Packaging PKHub ${LABEL}"
 
 TARGET="$ROOT/libs/borealis/library/lib/platforms/switch/switch_input.cpp"
 if [[ -f "$TARGET" ]] && ! grep -q 'screenshot_button_thread_fn(token)' "$TARGET"; then
@@ -50,7 +59,8 @@ docker run --rm \
     ls -lh build/switch/PKHub.nro build/switch/PKHub.elf
   '
 
-mkdir -p /opt/cursor/artifacts
+mkdir -p "$ROOT/dist" /opt/cursor/artifacts
+cp -f "$ROOT/build/switch/PKHub.nro" "$ROOT/dist/PKHub.nro"
 cp -f "$ROOT/build/switch/PKHub.nro" /opt/cursor/artifacts/PKHub.nro
-ls -lh /opt/cursor/artifacts/PKHub.nro
-echo "NRO ready: /opt/cursor/artifacts/PKHub.nro"
+ls -lh "$ROOT/dist/PKHub.nro" /opt/cursor/artifacts/PKHub.nro
+echo "NRO ready: $ROOT/dist/PKHub.nro (${LABEL})"

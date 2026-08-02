@@ -674,6 +674,32 @@ bool writeSave(std::vector<uint8_t>& data,
     return true;
 }
 
+GbaProbeResult probeSave(const std::vector<uint8_t>& data) {
+    GbaProbeResult out;
+    if (data.size() < kGbaSaveSize) {
+        return out;
+    }
+    const uint8_t* base = data.data();
+    const SlotInfo slotA = scanSlot(base + 0);
+    const SlotInfo slotB = scanSlot(base + kSlotSize);
+    if (slotA.validCount == 0 && slotB.validCount == 0) {
+        return out;
+    }
+    const SlotInfo* active = nullptr;
+    if (slotA.validCount == 0) {
+        active = &slotB;
+    } else if (slotB.validCount == 0) {
+        active = &slotA;
+    } else {
+        active = (slotB.saveIndex > slotA.saveIndex) ? &slotB : &slotA;
+    }
+    out.looksLikeGba = true;
+    out.validSections = active->validCount;
+    out.saveIndex = active->saveIndex;
+    out.game = detectGame(active->byId[0], active->byId[1]);
+    return out;
+}
+
 GbaParseResult parseSave(const std::vector<uint8_t>& data) {
     GbaParseResult result;
     result.party = Party{};
@@ -687,27 +713,27 @@ GbaParseResult parseSave(const std::vector<uint8_t>& data) {
         return result;
     }
 
-    const uint8_t* base = data.data();
-    const SlotInfo slotA = scanSlot(base + 0);
-    const SlotInfo slotB = scanSlot(base + kSlotSize);
-
-    const SlotInfo* active = nullptr;
-    if (slotA.validCount == 0 && slotB.validCount == 0) {
+    const GbaProbeResult probe = probeSave(data);
+    if (!probe.looksLikeGba) {
         result.message = "No valid Gen 3 save sections found";
         return result;
     }
+
+    const uint8_t* base = data.data();
+    const SlotInfo slotA = scanSlot(base + 0);
+    const SlotInfo slotB = scanSlot(base + kSlotSize);
+    const SlotInfo* active = nullptr;
     if (slotA.validCount == 0) {
         active = &slotB;
     } else if (slotB.validCount == 0) {
         active = &slotA;
     } else {
-        // Prefer higher save-index counter.
         active = (slotB.saveIndex > slotA.saveIndex) ? &slotB : &slotA;
     }
 
     const uint8_t* trainer = active->byId[0];
     const uint8_t* team = active->byId[1];
-    result.game = detectGame(trainer, team);
+    result.game = probe.game != GameId::Unknown ? probe.game : detectGame(trainer, team);
 
     // --- Party ---
     if (team) {

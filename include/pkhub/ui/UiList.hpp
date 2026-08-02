@@ -41,10 +41,32 @@ inline brls::DetailCell* makeDetailCell(const std::string& title,
     return cell;
 }
 
-inline brls::Header* makeSectionHeader(const std::string& title) {
+inline brls::Header* makeSectionHeader(const std::string& title,
+                                       const std::string& subtitle = {}) {
     auto* h = new brls::Header();
     h->setTitle(title);
+    if (!subtitle.empty()) {
+        h->setSubtitle(subtitle);
+    }
     return h;
+}
+
+/// Tip / prose block — never put long copy in DetailCell title+detail.
+inline void addTipBlock(brls::Box* content,
+                        const std::string& title,
+                        const std::string& body) {
+    content->addView(makeSectionHeader(title, body));
+}
+
+inline void addBodyLabel(brls::Box* content, const std::string& text) {
+    auto* wrap = new brls::Box(brls::Axis::COLUMN);
+    wrap->setPadding(2, 8, 8, 8);
+    auto* label = new brls::Label();
+    label->setFontSize(15);
+    label->setTextColor(nvgRGBA(170, 200, 185, 230));
+    label->setText(text);
+    wrap->addView(label);
+    content->addView(wrap);
 }
 
 inline void addClickableDetail(brls::Box* content,

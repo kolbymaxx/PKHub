@@ -28,6 +28,16 @@ struct GbaParseResult {
     bool ok = false;
 };
 
+/// Lightweight Gen 3 probe: section magic `0x08012025` + trainer/team game detect.
+struct GbaProbeResult {
+    bool looksLikeGba = false;
+    GameId game = GameId::Unknown;
+    int validSections = 0;
+    uint32_t saveIndex = 0;
+};
+
+GbaProbeResult probeSave(const std::vector<uint8_t>& data);
+
 /// Parse a Gen 3 GBA save (.sav / .srm). Uses the first 0x20000 bytes when larger (RTC footer).
 GbaParseResult parseSave(const std::vector<uint8_t>& data);
 

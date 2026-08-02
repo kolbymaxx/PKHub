@@ -9,12 +9,16 @@ mkdir -p "${OUT_DIR}/romfs"
   "${OUT_DIR}/PKHub.nacp" --titleid="${PKHUB_TITLEID}"
 test -s "${OUT_DIR}/PKHub.nacp"
 
-# Merge app + Borealis romfs assets (sprites, XML, fonts).
+# Merge app + Borealis romfs assets (sprites, XML, fonts, icons).
 cp -a "${PKHUB_RESOURCES}/." "${OUT_DIR}/romfs/"
 cp -a "${BOREALIS_RESOURCES}/." "${OUT_DIR}/romfs/"
 
-"${NX_ELF2NRO}" "${ELF_PATH}" "${OUT_DIR}/PKHub.nro" \
-  --nacp="${OUT_DIR}/PKHub.nacp" \
-  --romfsdir="${OUT_DIR}/romfs"
+NRO_ARGS=("${ELF_PATH}" "${OUT_DIR}/PKHub.nro"
+  --nacp="${OUT_DIR}/PKHub.nacp"
+  --romfsdir="${OUT_DIR}/romfs")
+if [[ -n "${PKHUB_ICON:-}" && -f "${PKHUB_ICON}" ]]; then
+  NRO_ARGS+=(--icon="${PKHUB_ICON}")
+fi
 
+"${NX_ELF2NRO}" "${NRO_ARGS[@]}"
 ls -lh "${OUT_DIR}/PKHub.nro"

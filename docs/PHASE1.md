@@ -15,6 +15,7 @@
 - **English species + nature name tables** (PokeAPI / official nature order) in box, party, editor
 - Polished Borealis UI (teal night theme, DetailCell lists, box/party/editor sprite slots)
 - Switch `.nro` packaging via `scripts/build_switch_nro.sh` (Docker DevKitPro)
+- **0.1.0-beta** homebrew package (`dist/PKHub.nro`) with app icon + branded home tabs
 - Z-A remains stubbed
 
 ## Build

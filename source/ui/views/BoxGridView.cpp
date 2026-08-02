@@ -8,20 +8,20 @@ namespace pkhub::ui {
 
 BoxGridView::BoxGridView() {
     setAxis(brls::Axis::COLUMN);
-    setPadding(18);
+    setPadding(14, 10, 10, 10);
     setGrow(1.f);
-    setBackgroundColor(nvgRGBA(12, 18, 22, 0));
+    setBackgroundColor(nvgRGBA(10, 16, 20, 0));
 
     title_ = new brls::Label();
-    title_->setFontSize(26);
-    title_->setTextColor(nvgRGB(230, 240, 235));
+    title_->setFontSize(24);
+    title_->setTextColor(nvgRGB(235, 248, 242));
     title_->setText("Box");
     addView(title_);
 
     auto* subtitle = new brls::Label();
-    subtitle->setFontSize(14);
-    subtitle->setTextColor(nvgRGBA(150, 180, 165, 220));
-    subtitle->setText("Tap a slot to edit");
+    subtitle->setFontSize(13);
+    subtitle->setTextColor(nvgRGBA(130, 185, 165, 220));
+    subtitle->setText("Tap a Pokémon to edit");
     addView(subtitle);
 
     grid_ = new brls::Box(brls::Axis::COLUMN);

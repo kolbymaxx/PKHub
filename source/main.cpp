@@ -213,7 +213,7 @@ static brls::View* buildEmuTab() {
 
 static brls::View* buildAboutView() {
     auto list = makeScrollList();
-    list.content->addView(makeBrandBanner(std::string(kAppVersion) + " · first public beta"));
+    list.content->addView(makeBrandBanner(std::string(kAppVersion)));
 
     list.content->addView(makeSectionHeader("This beta includes"));
     addBodyLabel(list.content, "Sword / Shield / Scarlet / Violet — SwishCrypto edit + write-back");

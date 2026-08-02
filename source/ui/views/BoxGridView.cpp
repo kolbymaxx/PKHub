@@ -8,7 +8,7 @@ namespace pkhub::ui {
 
 BoxGridView::BoxGridView() {
     setAxis(brls::Axis::COLUMN);
-    setPadding(14, 10, 10, 10);
+    setPadding(10, 4, 8, 4);
     setGrow(1.f);
     setBackgroundColor(nvgRGBA(10, 16, 20, 0));
 
@@ -20,13 +20,13 @@ BoxGridView::BoxGridView() {
 
     auto* subtitle = new brls::Label();
     subtitle->setFontSize(13);
-    subtitle->setTextColor(nvgRGBA(130, 185, 165, 220));
+    subtitle->setTextColor(nvgRGBA(120, 185, 160, 220));
     subtitle->setText("Tap a Pokémon to edit");
     addView(subtitle);
 
     grid_ = new brls::Box(brls::Axis::COLUMN);
     grid_->setGrow(1.f);
-    grid_->setPaddingTop(10);
+    grid_->setPaddingTop(12);
     addView(grid_);
 }
 
@@ -70,8 +70,8 @@ void BoxGridView::refresh() {
     for (std::size_t i = 0; i < box.size(); ++i) {
         if (i % kCols == 0) {
             row = new brls::Box(brls::Axis::ROW);
-            row->setPaddingTop(6);
-            row->setPaddingRight(4);
+            row->setPaddingTop(4);
+            row->setJustifyContent(brls::JustifyContent::FLEX_START);
             grid_->addView(row);
         }
         auto* slot = new PokemonSlotView();

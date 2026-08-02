@@ -19,6 +19,67 @@ namespace pkhub::ui {
 
 #if defined(PKHUB_HAS_BOREALIS)
 
+namespace {
+
+void spaceToolbarButton(brls::View* btn) {
+    btn->setMarginRight(10);
+}
+
+brls::Box* makePartyRow(const Pokemon& mon, std::size_t index) {
+    auto* row = new brls::Box(brls::Axis::ROW);
+    row->setAlignItems(brls::AlignItems::CENTER);
+    row->setPadding(10, 8, 10, 8);
+    row->setCornerRadius(10);
+    row->setBackgroundColor(nvgRGBA(18, 28, 34, 210));
+    row->setBorderThickness(1.0f);
+    row->setBorderColor(mon.empty() ? nvgRGBA(70, 90, 85, 50)
+                                    : (mon.isShiny ? nvgRGBA(230, 190, 70, 140)
+                                                   : nvgRGBA(90, 160, 135, 90)));
+    row->setMarginBottom(8);
+
+    auto* sprite = new brls::Image();
+    sprite->setWidth(48);
+    sprite->setHeight(48);
+    sprite->setScalingType(brls::ImageScalingType::FIT);
+    sprite->setCornerRadius(8);
+    if (!mon.empty()) {
+        const auto path = SpriteService::spritePath(mon);
+        if (!path.empty()) {
+            sprite->setImageFromRes(path);
+        }
+    }
+    row->addView(sprite);
+
+    auto* col = new brls::Box(brls::Axis::COLUMN);
+    col->setPaddingLeft(14);
+    col->setGrow(1.f);
+
+    auto* title = new brls::Label();
+    title->setFontSize(18);
+    title->setTextColor(nvgRGB(230, 242, 236));
+    if (mon.empty()) {
+        title->setText("Slot " + std::to_string(index + 1));
+    } else {
+        title->setText(pokemonDisplayName(mon) + (mon.isShiny ? "  ✦" : ""));
+    }
+    col->addView(title);
+
+    auto* sub = new brls::Label();
+    sub->setFontSize(13);
+    sub->setTextColor(nvgRGBA(130, 180, 160, 220));
+    if (mon.empty()) {
+        sub->setText("Empty");
+    } else {
+        sub->setText("Lv " + std::to_string(mon.level) + "  ·  #" +
+                     std::to_string(nationalDexId(mon)));
+    }
+    col->addView(sub);
+    row->addView(col);
+    return row;
+}
+
+}  // namespace
+
 brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title) {
     auto* body = new brls::Box(brls::Axis::COLUMN);
     body->setPadding(16);
@@ -26,7 +87,7 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
     body->setBackgroundColor(nvgRGB(10, 16, 20));
 
     auto* toolbar = new brls::Box(brls::Axis::ROW);
-    toolbar->setPaddingBottom(12);
+    toolbar->setPaddingBottom(14);
     toolbar->setAlignItems(brls::AlignItems::CENTER);
     auto* prev = new brls::Button();
     prev->setText("◀ Box");
@@ -36,6 +97,9 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
     partyBtn->setText("Party");
     auto* saveBtn = new brls::Button();
     saveBtn->setText("Save");
+    spaceToolbarButton(prev);
+    spaceToolbarButton(next);
+    spaceToolbarButton(partyBtn);
     toolbar->addView(prev);
     toolbar->addView(next);
     toolbar->addView(partyBtn);
@@ -73,20 +137,16 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
             return true;
         }
         auto list = makeScrollList();
-        list.content->addView(makeSectionHeader("Party"));
+        list.content->addView(makeSectionHeader("Party", "Tap a slot to edit"));
         for (std::size_t i = 0; i < provider->party().size(); ++i) {
             const auto& mon = provider->party().slot(i);
-            const std::string detail =
-                mon.empty() ? "Empty"
-                            : (pokemonDisplayName(mon) + "  Lv" +
-                               std::to_string(mon.level) +
-                               (mon.isShiny ? "  ✦" : ""));
-            addClickableDetail(list.content, "Slot " + std::to_string(i + 1), detail,
-                               [provider, i](brls::View*) {
-                                   brls::Application::pushActivity(new brls::Activity(
-                                       buildEditor(provider, true, 0, i)));
-                                   return true;
-                               });
+            auto* row = makePartyRow(mon, i);
+            row->registerClickAction([provider, i](brls::View*) {
+                brls::Application::pushActivity(
+                    new brls::Activity(buildEditor(provider, true, 0, i)));
+                return true;
+            });
+            list.content->addView(row);
         }
         brls::Application::pushActivity(
             new brls::Activity(makeAppletFrame("Party", list.scroll)));
@@ -126,13 +186,27 @@ brls::View* buildEditor(IBoxProvider* provider,
 
     auto list = makeScrollList();
     if (!mon || mon->empty()) {
-        list.content->addView(makeSectionHeader("Empty"));
-        addClickableDetail(list.content, "Empty slot",
-                           "Create tools / import coming next", nullptr);
+        list.content->addView(makeSectionHeader("Empty slot"));
+        addBodyLabel(list.content, "Create / import tools are coming next.");
     } else {
         auto* hero = new brls::Box(brls::Axis::ROW);
         hero->setAlignItems(brls::AlignItems::CENTER);
-        hero->setPadding(8, 12, 16, 12);
+        hero->setPadding(10, 8, 18, 8);
+        hero->setCornerRadius(14);
+        hero->setBackgroundColor(nvgRGBA(18, 28, 34, 230));
+        hero->setBorderThickness(1.0f);
+        hero->setBorderColor(mon->isShiny ? nvgRGBA(230, 190, 70, 150)
+                                          : nvgRGBA(78, 176, 148, 90));
+        hero->setMarginBottom(8);
+
+        auto* spriteFrame = new brls::Box(brls::Axis::COLUMN);
+        spriteFrame->setWidth(84);
+        spriteFrame->setHeight(84);
+        spriteFrame->setCornerRadius(12);
+        spriteFrame->setBackgroundColor(nvgRGB(24, 36, 44));
+        spriteFrame->setJustifyContent(brls::JustifyContent::CENTER);
+        spriteFrame->setAlignItems(brls::AlignItems::CENTER);
+
         auto* sprite = new brls::Image();
         sprite->setWidth(72);
         sprite->setHeight(72);
@@ -141,40 +215,44 @@ brls::View* buildEditor(IBoxProvider* provider,
         if (!path.empty()) {
             sprite->setImageFromRes(path);
         }
-        hero->addView(sprite);
+        spriteFrame->addView(sprite);
+        hero->addView(spriteFrame);
+
         auto* meta = new brls::Box(brls::Axis::COLUMN);
-        meta->setPaddingLeft(14);
+        meta->setPaddingLeft(16);
         auto* name = new brls::Label();
-        name->setFontSize(24);
-        name->setTextColor(nvgRGB(235, 245, 240));
+        name->setFontSize(26);
+        name->setTextColor(nvgRGB(235, 248, 242));
         name->setText(pokemonDisplayName(*mon) + (mon->isShiny ? "  ✦" : ""));
         meta->addView(name);
+
         auto* sub = new brls::Label();
-        sub->setFontSize(14);
-        sub->setTextColor(nvgRGBA(150, 180, 165, 230));
+        sub->setFontSize(15);
+        sub->setTextColor(nvgRGBA(130, 185, 165, 235));
         {
             const uint16_t nat = nationalDexId(*mon);
-            const char* speciesName = speciesEnglishName(nat);
             std::string line = "Lv " + std::to_string(mon->level) + "  ·  #" +
                                std::to_string(nat);
+            const char* speciesName = speciesEnglishName(nat);
             if (speciesName && *speciesName) {
                 line += " ";
                 line += speciesName;
             }
-            if (mon->nativeGeneration == Generation::Gen9) {
-                line += "  ·  SV#" + std::to_string(mon->species);
-            }
             sub->setText(line);
         }
         meta->addView(sub);
+
+        if (mon->nativeGeneration == Generation::Gen9) {
+            auto* sv = new brls::Label();
+            sv->setFontSize(13);
+            sv->setTextColor(nvgRGBA(110, 150, 135, 200));
+            sv->setText("SV internal id " + std::to_string(mon->species));
+            meta->addView(sv);
+        }
         hero->addView(meta);
         list.content->addView(hero);
 
-        list.content->addView(makeSectionHeader("Identity"));
-        addClickableDetail(list.content, "Species",
-                           std::string(speciesEnglishName(nationalDexId(*mon))) + " (#" +
-                               std::to_string(nationalDexId(*mon)) + ")",
-                           nullptr);
+        list.content->addView(makeSectionHeader("Edit"));
 
         auto* shiny = new brls::BooleanCell();
         shiny->init("Shiny", mon->isShiny, [mon](bool on) { mon->isShiny = on; });
@@ -224,13 +302,13 @@ brls::View* buildEditor(IBoxProvider* provider,
 
         list.content->addView(makeSectionHeader("Stats"));
         addClickableDetail(
-            list.content, "IVs HP/Atk/Def/SpA/SpD/Spe",
+            list.content, "IVs",
             std::to_string(mon->ivs.hp) + "/" + std::to_string(mon->ivs.atk) + "/" +
                 std::to_string(mon->ivs.def) + "/" + std::to_string(mon->ivs.spa) + "/" +
                 std::to_string(mon->ivs.spd) + "/" + std::to_string(mon->ivs.spe),
             nullptr);
 
-        addClickableDetail(list.content, "Set IVs 31", "Max all individual values",
+        addClickableDetail(list.content, "Set IVs 31", "Max all",
                            [mon](brls::View*) {
                                mon->ivs = Stats{31, 31, 31, 31, 31, 31};
                                brls::Application::notify("IVs set to 31");
@@ -238,13 +316,13 @@ brls::View* buildEditor(IBoxProvider* provider,
                            });
 
         addClickableDetail(
-            list.content, "EVs HP/Atk/Def/SpA/SpD/Spe",
+            list.content, "EVs",
             std::to_string(mon->evs.hp) + "/" + std::to_string(mon->evs.atk) + "/" +
                 std::to_string(mon->evs.def) + "/" + std::to_string(mon->evs.spa) + "/" +
                 std::to_string(mon->evs.spd) + "/" + std::to_string(mon->evs.spe),
             nullptr);
 
-        addClickableDetail(list.content, "Clear EVs", "Reset effort values to 0",
+        addClickableDetail(list.content, "Clear EVs", "Reset to 0",
                            [mon](brls::View*) {
                                mon->evs = Stats{};
                                brls::Application::notify("EVs cleared");
@@ -285,8 +363,7 @@ brls::View* buildEditor(IBoxProvider* provider,
         const auto report = legality.evaluate(*mon, provider->gameId());
         const auto gate = policy.evaluate(SafetyAction::EditPokemon, &report);
         if (gate.gate != SafetyGate::Allow) {
-            list.content->addView(makeSectionHeader("Safety"));
-            addClickableDetail(list.content, gate.title, gate.message, nullptr);
+            list.content->addView(makeSectionHeader("Safety", gate.message));
         }
     }
 

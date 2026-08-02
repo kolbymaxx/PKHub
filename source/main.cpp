@@ -35,7 +35,9 @@ namespace {
 #if defined(PKHUB_HAS_BOREALIS)
 
 using namespace pkhub;
+using pkhub::ui::addBodyLabel;
 using pkhub::ui::addClickableDetail;
+using pkhub::ui::addTipBlock;
 using pkhub::ui::makeAppletFrame;
 using pkhub::ui::makeBrandBanner;
 using pkhub::ui::makeScrollList;
@@ -46,9 +48,9 @@ static std::string gameStatusDetail(const DetectedSave& d) {
         return "Coming soon";
     }
     if (SwitchSaveMount::isTitleOverrideFor(d.titleId)) {
-        return "Ready · title override active";
+        return "Ready · override active";
     }
-    return "Ready · hold R on launch recommended";
+    return "Ready · hold R first";
 }
 
 static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId& user) {
@@ -75,18 +77,12 @@ static brls::View* buildSwitchGamesTab() {
     auto list = makeScrollList();
     list.content->addView(makeBrandBanner("First beta · official Switch saves"));
 
-    list.content->addView(makeSectionHeader("Quick tip"));
-    addClickableDetail(list.content, "Hold R while launching the game",
-                       "Then open PKHub for the most reliable save access",
-                       [](brls::View*) {
-                           brls::Application::notify(
-                               "Title override: hold R on the game, then launch PKHub");
-                           return true;
-                       });
+    addTipBlock(list.content, "Quick tip",
+                "Hold R while launching the game, then open PKHub.");
 
     auto users = listSwitchUsers();
     if (!users.empty()) {
-        addClickableDetail(list.content, "Switch profiles detected",
+        addClickableDetail(list.content, "Profiles on this Switch",
                            std::to_string(users.size()) + " user(s)", nullptr);
     }
 
@@ -218,19 +214,16 @@ static brls::View* buildEmuTab() {
 static brls::View* buildAboutView() {
     auto list = makeScrollList();
     list.content->addView(makeBrandBanner(std::string(kAppVersion) + " · first public beta"));
+
     list.content->addView(makeSectionHeader("This beta includes"));
-    addClickableDetail(list.content, "Sword / Shield / Scarlet / Violet",
-                       "SwishCrypto parse + edit + write-back", nullptr);
-    addClickableDetail(list.content, "Sprites + English names",
-                       "National Dex #1–1025, shiny variants", nullptr);
-    addClickableDetail(list.content, "GBA Gen 3 + RetroArch scan",
-                       "Raw emulator saves", nullptr);
-    addClickableDetail(list.content, "Hub Storage", "Cross-gen boxes on SD", nullptr);
+    addBodyLabel(list.content, "Sword / Shield / Scarlet / Violet — SwishCrypto edit + write-back");
+    addBodyLabel(list.content, "National Dex sprites + English names (#1–1025, shiny)");
+    addBodyLabel(list.content, "GBA Gen 3 + RetroArch save scan");
+    addBodyLabel(list.content, "Hub Storage — cross-gen boxes on SD");
+
     list.content->addView(makeSectionHeader("Coming next"));
-    addClickableDetail(list.content, "BDSP / Legends: Arceus",
-                       "Mount works; full parse still in progress", nullptr);
-    addClickableDetail(list.content, "Soft legality",
-                       "Warnings first — confirm only for high-risk writes", nullptr);
+    addBodyLabel(list.content, "BDSP / Legends: Arceus full parse (mount works today)");
+    addBodyLabel(list.content, "Soft legality — warn first, confirm only high-risk writes");
     return list.scroll;
 }
 

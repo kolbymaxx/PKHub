@@ -8,7 +8,7 @@ Three primary destinations (tab bar or large home tiles — Borealis `TabFrame` 
 ┌──────────────────────────────────────────────────────────┐
 │  PKHub                                                    │
 │                                                          │
-│   [ Switch Games ]   [ Emulator Saves ]   [ Hub Storage ] │
+│   [ Games ]   [ Files ]   [ Hub ]                          │
 │                                                          │
 │   Recent sessions · Safety tip strip (non-hero)           │
 └──────────────────────────────────────────────────────────┘
@@ -17,8 +17,8 @@ Three primary destinations (tab bar or large home tiles — Borealis `TabFrame` 
 | Entry | Purpose |
 |-------|---------|
 | **Switch Games** | Detect installed / known official titles; open via libnx save APIs |
-| **Emulator Saves** | Auto-scan RetroArch (+ common paths) and manual file browser |
-| **Hub Storage** | Persistent bank; always available offline |
+| **Files** | Auto-scan RetroArch (+ common paths) and manual file browser |
+| **Hub** | Persistent bank; always available offline |
 
 Secondary (overflow / settings gear): Backups, Settings, About, Legality info.
 
@@ -34,7 +34,7 @@ Secondary (overflow / settings gear): Backups, Settings, About, Legality info.
 ## Flow A — Switch Games
 
 ```
-Home → Switch Games
+Home → Games
   → Game list (SV, SwSh, LA, BDSP, …; Z-A shown as stub)
   → Access mode hint (title override recommended)
   → User/account picker (when using FsSaveData)
@@ -45,7 +45,7 @@ Home → Switch Games
 ## Flow B — Emulator Saves
 
 ```
-Home → Emulator Saves
+Home → Files
   → Tabs: Detected | Browse
   → Detected: RetroArch cores paths (GBA → NDS → 3DS priority)
   → Browse: FileBrowserActivity (filter .sav .srm .dsv …)

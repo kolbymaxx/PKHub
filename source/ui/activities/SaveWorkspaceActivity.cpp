@@ -1,27 +1,36 @@
 #include "pkhub/ui/activities/MainActivity.hpp"
 
 #include "pkhub/app/AppContext.hpp"
+#include "pkhub/core/pokemon/NatureNames.hpp"
+#include "pkhub/core/pokemon/SpeciesIds.hpp"
+#include "pkhub/core/pokemon/SpeciesNames.hpp"
 #include "pkhub/core/safety/LegalityService.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
+#include "pkhub/ui/SpriteService.hpp"
+#include "pkhub/ui/UiList.hpp"
 #include "pkhub/ui/views/BoxGridView.hpp"
+
+#if defined(PKHUB_HAS_BOREALIS)
+#include <borealis/views/cells/cell_bool.hpp>
+#include <borealis/views/cells/cell_detail.hpp>
+#endif
 
 namespace pkhub::ui {
 
 #if defined(PKHUB_HAS_BOREALIS)
 
 brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title) {
-    auto* root = new brls::AppletFrame();
-    root->setTitle(title.empty() ? "Save Workspace" : title);
-
     auto* body = new brls::Box(brls::Axis::COLUMN);
     body->setPadding(16);
     body->setGrow(1.f);
+    body->setBackgroundColor(nvgRGB(14, 20, 24));
 
     auto* toolbar = new brls::Box(brls::Axis::ROW);
+    toolbar->setPaddingBottom(10);
     auto* prev = new brls::Button();
-    prev->setText("Prev Box");
+    prev->setText("Prev");
     auto* next = new brls::Button();
-    next->setText("Next Box");
+    next->setText("Next");
     auto* partyBtn = new brls::Button();
     partyBtn->setText("Party");
     auto* saveBtn = new brls::Button();
@@ -62,25 +71,24 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
         if (!provider) {
             return true;
         }
-        auto* list = new brls::List();
+        auto list = makeScrollList();
+        list.content->addView(makeSectionHeader("Party"));
         for (std::size_t i = 0; i < provider->party().size(); ++i) {
             const auto& mon = provider->party().slot(i);
-            auto* item = new brls::ListItem(
-                "Slot " + std::to_string(i + 1),
+            const std::string detail =
                 mon.empty() ? "Empty"
-                            : ("Species " + std::to_string(mon.species) + " Lv" +
-                               std::to_string(mon.level)));
-            item->registerClickAction([provider, i](brls::View*) {
-                brls::Application::pushActivity(
-                    new brls::Activity(buildEditor(provider, true, 0, i)));
-                return true;
-            });
-            list->addView(item);
+                            : (pokemonDisplayName(mon) + "  Lv" +
+                               std::to_string(mon.level) +
+                               (mon.isShiny ? "  ✦" : ""));
+            addClickableDetail(list.content, "Slot " + std::to_string(i + 1), detail,
+                               [provider, i](brls::View*) {
+                                   brls::Application::pushActivity(new brls::Activity(
+                                       buildEditor(provider, true, 0, i)));
+                                   return true;
+                               });
         }
-        auto* frame = new brls::AppletFrame();
-        frame->setTitle("Party");
-        frame->setContentView(list);
-        brls::Application::pushActivity(new brls::Activity(frame));
+        brls::Application::pushActivity(
+            new brls::Activity(makeAppletFrame("Party", list.scroll)));
         return true;
     });
     saveBtn->registerClickAction([](brls::View*) {
@@ -94,17 +102,13 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
         return true;
     });
 
-    root->setContentView(body);
-    return root;
+    return makeAppletFrame(title.empty() ? "Save Workspace" : title, body);
 }
 
 brls::View* buildEditor(IBoxProvider* provider,
                         bool fromParty,
                         std::size_t boxIndex,
                         std::size_t slotIndex) {
-    auto* root = new brls::AppletFrame();
-    root->setTitle("Editor");
-
     Pokemon* mon = nullptr;
     if (provider) {
         if (fromParty) {
@@ -119,99 +123,148 @@ brls::View* buildEditor(IBoxProvider* provider,
         }
     }
 
-    auto* list = new brls::List();
+    auto list = makeScrollList();
     if (!mon || mon->empty()) {
-        list->addView(new brls::ListItem("Empty slot", "Create tools / import coming next"));
+        list.content->addView(makeSectionHeader("Empty"));
+        addClickableDetail(list.content, "Empty slot",
+                           "Create tools / import coming next", nullptr);
     } else {
-        list->addView(new brls::ListItem(
-            "Species",
-            std::to_string(mon->species) +
-                (mon->nativeGeneration == Generation::Gen9 ? " (SV internal id)" : "")));
+        auto* hero = new brls::Box(brls::Axis::ROW);
+        hero->setAlignItems(brls::AlignItems::CENTER);
+        hero->setPadding(8, 12, 16, 12);
+        auto* sprite = new brls::Image();
+        sprite->setWidth(72);
+        sprite->setHeight(72);
+        sprite->setScalingType(brls::ImageScalingType::FIT);
+        const auto path = SpriteService::spritePath(*mon);
+        if (!path.empty()) {
+            sprite->setImageFromRes(path);
+        }
+        hero->addView(sprite);
+        auto* meta = new brls::Box(brls::Axis::COLUMN);
+        meta->setPaddingLeft(14);
+        auto* name = new brls::Label();
+        name->setFontSize(24);
+        name->setTextColor(nvgRGB(235, 245, 240));
+        name->setText(pokemonDisplayName(*mon) + (mon->isShiny ? "  ✦" : ""));
+        meta->addView(name);
+        auto* sub = new brls::Label();
+        sub->setFontSize(14);
+        sub->setTextColor(nvgRGBA(150, 180, 165, 230));
+        {
+            const uint16_t nat = nationalDexId(*mon);
+            const char* speciesName = speciesEnglishName(nat);
+            std::string line = "Lv " + std::to_string(mon->level) + "  ·  #" +
+                               std::to_string(nat);
+            if (speciesName && *speciesName) {
+                line += " ";
+                line += speciesName;
+            }
+            if (mon->nativeGeneration == Generation::Gen9) {
+                line += "  ·  SV#" + std::to_string(mon->species);
+            }
+            sub->setText(line);
+        }
+        meta->addView(sub);
+        hero->addView(meta);
+        list.content->addView(hero);
 
-        auto* shiny = new brls::ListItem("Shiny");
-        shiny->setChecked(mon->isShiny);
-        shiny->registerClickAction([mon, shiny](brls::View*) {
-            mon->isShiny = !mon->isShiny;
-            shiny->setChecked(mon->isShiny);
-            return true;
-        });
-        list->addView(shiny);
+        list.content->addView(makeSectionHeader("Identity"));
+        addClickableDetail(list.content, "Species",
+                           std::string(speciesEnglishName(nationalDexId(*mon))) + " (#" +
+                               std::to_string(nationalDexId(*mon)) + ")",
+                           nullptr);
 
-        auto* level = new brls::ListItem("Level", std::to_string(mon->level));
+        auto* shiny = new brls::BooleanCell();
+        shiny->init("Shiny", mon->isShiny, [mon](bool on) { mon->isShiny = on; });
+        list.content->addView(shiny);
+
+        auto* level = makeDetailCell("Level", std::to_string(mon->level));
         level->registerClickAction([mon, level](brls::View*) {
             mon->level = uint8_t(mon->level >= 100 ? 1 : mon->level + 1);
-            level->setDescription(std::to_string(mon->level));
+            level->setDetailText(std::to_string(mon->level));
             return true;
         });
-        list->addView(level);
+        list.content->addView(level);
 
-        auto* nature = new brls::ListItem("Nature", std::to_string(mon->nature));
-        nature->registerClickAction([mon, nature](brls::View*) {
+        auto natureLabel = [](const Pokemon& m) -> std::string {
+            const char* n = natureEnglishName(m.nature);
+            if (n && *n) {
+                return n;
+            }
+            return std::to_string(m.nature);
+        };
+        auto* nature = makeDetailCell("Nature", natureLabel(*mon));
+        nature->registerClickAction([mon, nature, natureLabel](brls::View*) {
             const int n = ((mon->nature < 0 ? 0 : int(mon->nature)) + 1) % 25;
             mon->nature = int8_t(n);
-            nature->setDescription(std::to_string(mon->nature));
+            nature->setDetailText(natureLabel(*mon));
             return true;
         });
-        list->addView(nature);
+        list.content->addView(nature);
 
-        auto* ability = new brls::ListItem("Ability ID", std::to_string(mon->abilityId));
+        auto* ability = makeDetailCell("Ability ID", std::to_string(mon->abilityId));
         ability->registerClickAction([mon, ability](brls::View*) {
             mon->abilityId = uint16_t(mon->abilityId + 1);
-            ability->setDescription(std::to_string(mon->abilityId));
+            ability->setDetailText(std::to_string(mon->abilityId));
             return true;
         });
-        list->addView(ability);
+        list.content->addView(ability);
 
-        auto* abilitySlot = new brls::ListItem("Ability slot", std::to_string(mon->abilitySlot));
+        auto* abilitySlot =
+            makeDetailCell("Ability slot", std::to_string(mon->abilitySlot));
         abilitySlot->registerClickAction([mon, abilitySlot](brls::View*) {
             const int s = ((mon->abilitySlot < 0 ? 0 : int(mon->abilitySlot)) + 1) % 4;
             mon->abilitySlot = int8_t(s);
-            abilitySlot->setDescription(std::to_string(mon->abilitySlot));
+            abilitySlot->setDetailText(std::to_string(mon->abilitySlot));
             return true;
         });
-        list->addView(abilitySlot);
+        list.content->addView(abilitySlot);
 
-        list->addView(new brls::ListItem(
-            "IVs HP/Atk/Def/SpA/SpD/Spe",
+        list.content->addView(makeSectionHeader("Stats"));
+        addClickableDetail(
+            list.content, "IVs HP/Atk/Def/SpA/SpD/Spe",
             std::to_string(mon->ivs.hp) + "/" + std::to_string(mon->ivs.atk) + "/" +
                 std::to_string(mon->ivs.def) + "/" + std::to_string(mon->ivs.spa) + "/" +
-                std::to_string(mon->ivs.spd) + "/" + std::to_string(mon->ivs.spe)));
+                std::to_string(mon->ivs.spd) + "/" + std::to_string(mon->ivs.spe),
+            nullptr);
 
-        auto* maxIvs = new brls::ListItem("Set IVs 31");
-        maxIvs->registerClickAction([mon](brls::View*) {
-            mon->ivs = Stats{31, 31, 31, 31, 31, 31};
-            brls::Application::notify("IVs set to 31");
-            return true;
-        });
-        list->addView(maxIvs);
+        addClickableDetail(list.content, "Set IVs 31", "Max all individual values",
+                           [mon](brls::View*) {
+                               mon->ivs = Stats{31, 31, 31, 31, 31, 31};
+                               brls::Application::notify("IVs set to 31");
+                               return true;
+                           });
 
-        list->addView(new brls::ListItem(
-            "EVs HP/Atk/Def/SpA/SpD/Spe",
+        addClickableDetail(
+            list.content, "EVs HP/Atk/Def/SpA/SpD/Spe",
             std::to_string(mon->evs.hp) + "/" + std::to_string(mon->evs.atk) + "/" +
                 std::to_string(mon->evs.def) + "/" + std::to_string(mon->evs.spa) + "/" +
-                std::to_string(mon->evs.spd) + "/" + std::to_string(mon->evs.spe)));
+                std::to_string(mon->evs.spd) + "/" + std::to_string(mon->evs.spe),
+            nullptr);
 
-        auto* clearEvs = new brls::ListItem("Clear EVs");
-        clearEvs->registerClickAction([mon](brls::View*) {
-            mon->evs = Stats{};
-            brls::Application::notify("EVs cleared");
-            return true;
-        });
-        list->addView(clearEvs);
+        addClickableDetail(list.content, "Clear EVs", "Reset effort values to 0",
+                           [mon](brls::View*) {
+                               mon->evs = Stats{};
+                               brls::Application::notify("EVs cleared");
+                               return true;
+                           });
 
+        list.content->addView(makeSectionHeader("Moves"));
         for (int i = 0; i < 4; ++i) {
-            auto* mv = new brls::ListItem("Move " + std::to_string(i + 1),
-                                         std::to_string(mon->moves[std::size_t(i)]));
+            auto* mv = makeDetailCell("Move " + std::to_string(i + 1),
+                                      std::to_string(mon->moves[std::size_t(i)]));
             mv->registerClickAction([mon, i, mv](brls::View*) {
                 mon->moves[std::size_t(i)] = uint16_t(mon->moves[std::size_t(i)] + 1);
-                mv->setDescription(std::to_string(mon->moves[std::size_t(i)]));
+                mv->setDetailText(std::to_string(mon->moves[std::size_t(i)]));
                 return true;
             });
-            list->addView(mv);
+            list.content->addView(mv);
         }
 
         if (mon->nativeGeneration == Generation::Gen9 || mon->teraType != PokemonType::None) {
-            auto* tera = new brls::ListItem("Tera type", std::to_string(int(mon->teraType)));
+            list.content->addView(makeSectionHeader("Scarlet / Violet"));
+            auto* tera = makeDetailCell("Tera type", std::to_string(int(mon->teraType)));
             tera->registerClickAction([mon, tera](brls::View*) {
                 int t = int(mon->teraType);
                 if (t < 0 || t > 18) {
@@ -220,10 +273,10 @@ brls::View* buildEditor(IBoxProvider* provider,
                     t = (t + 1) % 19;
                 }
                 mon->teraType = static_cast<PokemonType>(t);
-                tera->setDescription(std::to_string(int(mon->teraType)));
+                tera->setDetailText(std::to_string(int(mon->teraType)));
                 return true;
             });
-            list->addView(tera);
+            list.content->addView(tera);
         }
 
         SafetyPolicy policy;
@@ -231,12 +284,12 @@ brls::View* buildEditor(IBoxProvider* provider,
         const auto report = legality.evaluate(*mon, provider->gameId());
         const auto gate = policy.evaluate(SafetyAction::EditPokemon, &report);
         if (gate.gate != SafetyGate::Allow) {
-            list->addView(new brls::ListItem(gate.title, gate.message));
+            list.content->addView(makeSectionHeader("Safety"));
+            addClickableDetail(list.content, gate.title, gate.message, nullptr);
         }
     }
 
-    root->setContentView(list);
-    return root;
+    return makeAppletFrame("Editor", list.scroll);
 }
 
 #endif

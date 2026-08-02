@@ -186,16 +186,11 @@ SwitchMountResult SwitchSaveMount::mountFsSaveData(uint64_t titleId, const Switc
     }
 
     FsFileSystem saveFs;
-    FsSaveDataAttribute attr{};
-    attr.uid = uid;
-    attr.application_id = titleId;
-    attr.save_data_type = FsSaveDataType_Account;
-
-    const Result rc = fsOpenSaveDataFileSystemBySaveDataAttribute(
-        &saveFs, FsSaveDataSpaceId_User, &attr);
+    // libnx wrapper around fsOpenSaveDataFileSystem for account saves.
+    const Result rc = fsOpen_SaveData(&saveFs, titleId, uid);
     if (R_FAILED(rc)) {
         out.status = MountStatus::PermissionDenied;
-        out.message = "fsOpenSaveDataFileSystem failed. Prefer title override (hold R).";
+        out.message = "fsOpen_SaveData failed. Prefer title override (hold R).";
         return out;
     }
 

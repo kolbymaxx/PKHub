@@ -19,8 +19,11 @@ public:
     void setSelected(bool selected);
 
 private:
-    brls::Rectangle* swatch_ = nullptr;
+    brls::Box* frame_ = nullptr;
+    brls::Image* image_ = nullptr;
+    brls::Rectangle* fallback_ = nullptr;
     brls::Label* label_ = nullptr;
+    brls::Label* shinyBadge_ = nullptr;
 };
 
 #else

@@ -5,6 +5,8 @@ out/
 *.o
 *.elf
 *.nro
+!dist/
+!dist/**
 *.nacp
 *.nso
 *.npdm

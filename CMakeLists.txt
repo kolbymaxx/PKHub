@@ -79,6 +79,7 @@ set(PKHUB_SOURCES
     source/backends/raw/RawSaveBackend.cpp
     source/backends/raw/gba/GbaGen3.cpp
     source/backends/discovery/SaveDiscovery.cpp
+    source/backends/discovery/SaveProbe.cpp
     source/platform/SaveAccess.cpp
     source/platform/SwitchSaveMount.cpp
     source/ui/UiBootstrap.cpp
@@ -239,12 +240,15 @@ if(PKHUB_BUILD_TESTS AND NOT PLATFORM_SWITCH)
     add_executable(pkhub_gba_writeback tests/gba_writeback_test.cpp
         source/backends/raw/gba/GbaGen3.cpp
         source/backends/raw/RawSaveBackend.cpp
+        source/backends/discovery/SaveProbe.cpp
+        source/backends/switch/SwishCrypto.cpp
         source/core/pokemon/GameId.cpp
         source/core/pokemon/Pokemon.cpp
         source/core/save/Box.cpp
         source/core/fs/Paths.cpp
     )
-    target_include_directories(pkhub_gba_writeback PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(pkhub_gba_writeback PRIVATE
+        ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/libs/sha256)
     target_compile_options(pkhub_gba_writeback PRIVATE -Wall -Wextra -Wno-unused-parameter -fexceptions -frtti)
     add_test(NAME gba_writeback COMMAND pkhub_gba_writeback)
 
@@ -265,6 +269,7 @@ if(PKHUB_BUILD_TESTS AND NOT PLATFORM_SWITCH)
 
     add_executable(pkhub_emu_scan tests/emu_scan_test.cpp
         source/backends/discovery/SaveDiscovery.cpp
+        source/backends/discovery/SaveProbe.cpp
         source/backends/raw/RawSaveBackend.cpp
         source/backends/raw/gba/GbaGen3.cpp
         ${PKHUB_SWITCH_CRYPTO_SOURCES}

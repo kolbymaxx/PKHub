@@ -1,5 +1,6 @@
 #include "pkhub/backends/SaveDiscovery.hpp"
 #include "pkhub/backends/RawSaveBackend.hpp"
+#include "pkhub/backends/SaveProbe.hpp"
 #include "pkhub/backends/SwitchSaveBackend.hpp"
 #include "pkhub/backends/UnsupportedSaveBackend.hpp"
 #include "pkhub/core/fs/FileBrowser.hpp"
@@ -7,6 +8,7 @@
 #include "pkhub/platform/TitleIds.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -14,32 +16,40 @@
 namespace pkhub {
 namespace {
 
-std::string basenameOf(const std::string& path) {
-    const auto pos = path.find_last_of('/');
-    if (pos == std::string::npos) {
-        return path;
-    }
-    return path.substr(pos + 1);
-}
-
-std::string formatHintFor(RawSaveFormat fmt) {
-    switch (fmt) {
-        case RawSaveFormat::GbaSav: return "GBA";
-        case RawSaveFormat::NdsSav: return "NDS";
-        case RawSaveFormat::NdsDsv: return "DSV";
-        case RawSaveFormat::CtrSave: return "3DS";
-        default: return "RAW";
+bool isMountOnlySwitchGame(GameId game) {
+    switch (game) {
+        case GameId::BrilliantDiamond:
+        case GameId::ShiningPearl:
+        case GameId::LegendsArceus:
+            return true;
+        default:
+            return false;
     }
 }
 
-Generation generationHintFor(RawSaveFormat fmt) {
-    switch (fmt) {
-        case RawSaveFormat::GbaSav: return Generation::Gen3;
-        case RawSaveFormat::NdsSav:
-        case RawSaveFormat::NdsDsv: return Generation::Gen4;  // refined on open
-        case RawSaveFormat::CtrSave: return Generation::Gen6;
-        default: return Generation::Unknown;
+bool isPcReadySwitchGame(GameId game) {
+    switch (game) {
+        case GameId::Sword:
+        case GameId::Shield:
+        case GameId::Scarlet:
+        case GameId::Violet:
+            return true;
+        default:
+            return false;
     }
+}
+
+int sortRank(const DetectedSave& d) {
+    if (d.formatSupported && d.formatHint.rfind("GBA", 0) == 0) {
+        return 0;
+    }
+    if (d.formatSupported) {
+        return 1;
+    }
+    if (d.game != GameId::Unknown) {
+        return 2;
+    }
+    return 3;
 }
 
 }  // namespace
@@ -109,6 +119,15 @@ std::vector<DetectedSave> scanKnownSwitchTitles() {
             d.unsupportedReason =
                 "Pokémon Legends: Z-A save format is not yet documented. "
                 "Support will be added when the structure is known.";
+            d.formatHint = "Coming soon";
+        } else if (isPcReadySwitchGame(g.game)) {
+            d.formatHint = "Open PC";
+        } else if (isMountOnlySwitchGame(g.game)) {
+            d.formatHint = "Mount · boxes soon";
+            d.unsupportedReason =
+                "Save mounts, but entity parse needs clean-room offsets.";
+        } else {
+            d.formatHint = "Open PC";
         }
         out.push_back(std::move(d));
     }
@@ -119,8 +138,20 @@ std::optional<DetectedSave> detectRawSaveFile(const std::string& path) {
     if (path.empty() || !fs::isRegularFile(path)) {
         return std::nullopt;
     }
+
     const std::string ext = fs::fileExtension(path);
-    if (ext != "sav" && ext != "srm" && ext != "dsv") {
+    const std::string base = [&]() {
+        const auto pos = path.find_last_of('/');
+        return (pos == std::string::npos) ? path : path.substr(pos + 1);
+    }();
+    std::string baseLower = base;
+    for (char& c : baseLower) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    // Accept classic emu extensions + extensionless / .bin Switch `main` dumps.
+    const bool okExt = (ext == "sav" || ext == "srm" || ext == "dsv" || ext == "bin" ||
+                        ext.empty() || baseLower == "main");
+    if (!okExt) {
         return std::nullopt;
     }
 
@@ -130,19 +161,28 @@ std::optional<DetectedSave> detectRawSaveFile(const std::string& path) {
     }
     std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)),
                               std::istreambuf_iterator<char>());
-    const RawSaveFormat fmt = detectRawFormat(path, data);
+    if (data.empty()) {
+        return std::nullopt;
+    }
+
+    const SaveProbeResult probe = probeSaveBytes(path, data);
+    // Drop total unknowns with no useful hint (e.g. random .bin).
+    if (probe.format == RawSaveFormat::Unknown && !probe.isSwishDump &&
+        probe.confidence < 30 && probe.game == GameId::Unknown) {
+        if (ext == "bin" || ext.empty()) {
+            return std::nullopt;
+        }
+    }
 
     DetectedSave d;
     d.path = path;
-    d.displayName = basenameOf(path);
+    d.displayName = probe.displayName.empty() ? base : probe.displayName;
     d.isSwitchOfficial = false;
-    d.formatHint = formatHintFor(fmt);
-    d.generation = generationHintFor(fmt);
-    d.game = GameId::Unknown;
-    d.formatSupported = (fmt == RawSaveFormat::GbaSav);  // Phase 1: GBA open/write ready
-    if (!d.formatSupported) {
-        d.unsupportedReason = "Parser for this raw format is not implemented yet.";
-    }
+    d.formatHint = probe.formatHint;
+    d.generation = probe.generation;
+    d.game = probe.game;
+    d.formatSupported = probe.formatSupported;
+    d.unsupportedReason = probe.unsupportedReason;
     return d;
 }
 
@@ -153,14 +193,13 @@ std::vector<DetectedSave> scanRetroArchSaves(const std::vector<std::string>& roo
     std::set<std::string> seenResolved;
     std::vector<DetectedSave> out;
 
-    const std::vector<std::string> exts = {"sav", "srm", "dsv"};
+    const std::vector<std::string> exts = {"sav", "srm", "dsv", "bin"};
     for (const auto& root : useRoots) {
         if (!fs::isDirectory(root)) {
             continue;
         }
         auto files = fs::findFilesWithExtensions(root, exts, /*maxDepth=*/5, /*maxFiles=*/300);
         for (const auto& file : files) {
-            // Dedupe sdmc:/foo vs /foo on desktop (same resolved path).
             if (!seenResolved.insert(fs::resolvePath(file)).second) {
                 continue;
             }
@@ -170,10 +209,9 @@ std::vector<DetectedSave> scanRetroArchSaves(const std::vector<std::string>& roo
         }
     }
 
-    // GBA (.sav/.srm that look like GBA) first, then others.
     std::sort(out.begin(), out.end(), [](const DetectedSave& a, const DetectedSave& b) {
-        const int ra = (a.formatHint == "GBA") ? 0 : 1;
-        const int rb = (b.formatHint == "GBA") ? 0 : 1;
+        const int ra = sortRank(a);
+        const int rb = sortRank(b);
         if (ra != rb) {
             return ra < rb;
         }

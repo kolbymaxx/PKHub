@@ -1,5 +1,6 @@
 #include "pkhub/ui/views/BoxGridView.hpp"
 
+#include "pkhub/ui/ThemeTokens.hpp"
 #include "pkhub/ui/views/PokemonSlotView.hpp"
 
 namespace pkhub::ui {
@@ -8,25 +9,39 @@ namespace pkhub::ui {
 
 BoxGridView::BoxGridView() {
     setAxis(brls::Axis::COLUMN);
-    setPadding(10, 4, 8, 4);
+    setPadding(8, 6, 6, 6);
     setGrow(1.f);
-    setBackgroundColor(nvgRGBA(10, 16, 20, 0));
+    setCornerRadius(16);
+    setBackgroundColor(theme::bgWallpaper());
+    setBorderThickness(1.0f);
+    setBorderColor(theme::accentDim());
+
+    auto* header = new brls::Box(brls::Axis::COLUMN);
+    header->setPadding(4, 6, 2, 6);
 
     title_ = new brls::Label();
-    title_->setFontSize(24);
-    title_->setTextColor(nvgRGB(235, 248, 242));
+    title_->setFontSize(22);
+    title_->setTextColor(theme::text());
     title_->setText("Box");
-    addView(title_);
+    header->addView(title_);
 
     auto* subtitle = new brls::Label();
     subtitle->setFontSize(13);
-    subtitle->setTextColor(nvgRGBA(120, 185, 160, 220));
-    subtitle->setText("Tap a Pokémon to edit");
-    addView(subtitle);
+    subtitle->setTextColor(theme::textMuted());
+    subtitle->setText("Organize Boxes · tap a Pokémon");
+    header->addView(subtitle);
+    addView(header);
+
+    auto* divider = new brls::Rectangle(theme::rule());
+    divider->setHeight(1);
+    divider->setMarginTop(8);
+    divider->setMarginBottom(4);
+    addView(divider);
 
     grid_ = new brls::Box(brls::Axis::COLUMN);
     grid_->setGrow(1.f);
-    grid_->setPaddingTop(12);
+    grid_->setPaddingTop(6);
+    grid_->setPaddingLeft(2);
     addView(grid_);
 }
 
@@ -57,7 +72,6 @@ void BoxGridView::refresh() {
         return;
     }
 
-    // Qualify: BoxGridView inherits brls::Box, so bare `Box` resolves to the UI base.
     const pkhub::Box& box = provider_->box(boxIndex_);
     if (title_) {
         const std::string name =
@@ -70,7 +84,7 @@ void BoxGridView::refresh() {
     for (std::size_t i = 0; i < box.size(); ++i) {
         if (i % kCols == 0) {
             row = new brls::Box(brls::Axis::ROW);
-            row->setPaddingTop(4);
+            row->setPaddingTop(2);
             row->setJustifyContent(brls::JustifyContent::FLEX_START);
             grid_->addView(row);
         }

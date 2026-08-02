@@ -40,17 +40,24 @@ using pkhub::ui::addClickableDetail;
 using pkhub::ui::addTipBlock;
 using pkhub::ui::makeAppletFrame;
 using pkhub::ui::makeBrandBanner;
+using pkhub::ui::makeGameOpenRow;
 using pkhub::ui::makeScrollList;
 using pkhub::ui::makeSectionHeader;
 
 static std::string gameStatusDetail(const DetectedSave& d) {
     if (!d.formatSupported) {
-        return "Coming soon";
+        return d.formatHint.empty() ? "Coming soon" : d.formatHint;
+    }
+    if (!d.formatHint.empty()) {
+        if (SwitchSaveMount::isTitleOverrideFor(d.titleId)) {
+            return d.formatHint + " · override active";
+        }
+        return d.formatHint + " · hold R first";
     }
     if (SwitchSaveMount::isTitleOverrideFor(d.titleId)) {
         return "Ready · override active";
     }
-    return "Ready · hold R first";
+    return "Open PC · hold R first";
 }
 
 static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId& user) {
@@ -75,10 +82,10 @@ static bool openSwitchDetected(const DetectedSave& detected, const SwitchUserId&
 
 static brls::View* buildSwitchGamesTab() {
     auto list = makeScrollList();
-    list.content->addView(makeBrandBanner("First beta · official Switch saves"));
+    list.content->addView(makeBrandBanner("Game companion · official Switch saves"));
 
-    addTipBlock(list.content, "Quick tip",
-                "Hold R while launching the game, then open PKHub.");
+    addTipBlock(list.content, "How to open a save",
+                "Hold R while launching the game, then open PKHub → Open PC.");
 
     auto users = listSwitchUsers();
     if (!users.empty()) {
@@ -89,38 +96,36 @@ static brls::View* buildSwitchGamesTab() {
     list.content->addView(makeSectionHeader("Games"));
     for (const auto& d : scanKnownSwitchTitles()) {
         DetectedSave detected = d;
-        addClickableDetail(list.content, d.displayName, gameStatusDetail(d),
-                           [detected, users](brls::View*) {
-                               if (users.size() <= 1) {
-                                   SwitchUserId uid =
-                                       users.empty() ? SwitchUserId{} : users[0].id;
-                                   return openSwitchDetected(detected, uid);
-                               }
-                               auto picker = makeScrollList();
-                               picker.content->addView(
-                                   makeBrandBanner("Choose a profile"));
-                               picker.content->addView(makeSectionHeader("Profiles"));
-                               for (const auto& u : users) {
-                                   DetectedSave det = detected;
-                                   SwitchUserId uid = u.id;
-                                   addClickableDetail(
-                                       picker.content,
-                                       u.nickname.empty() ? "User" : u.nickname,
-                                       "Open save for this profile",
-                                       [det, uid](brls::View*) {
-                                           return openSwitchDetected(det, uid);
-                                       });
-                               }
-                               addClickableDetail(
-                                   picker.content, "Use title override",
-                                   "No explicit user id", [detected](brls::View*) {
-                                       return openSwitchDetected(detected, {});
-                                   });
-                               brls::Application::pushActivity(new brls::Activity(
-                                   makeAppletFrame("Choose user — " + detected.displayName,
-                                                   picker.scroll)));
-                               return true;
-                           });
+        list.content->addView(makeGameOpenRow(
+            d.displayName, gameStatusDetail(d), [detected, users](brls::View*) {
+                if (users.size() <= 1) {
+                    SwitchUserId uid = users.empty() ? SwitchUserId{} : users[0].id;
+                    return openSwitchDetected(detected, uid);
+                }
+                auto picker = makeScrollList();
+                picker.content->addView(makeBrandBanner("Choose a profile"));
+                picker.content->addView(makeSectionHeader("Profiles"));
+                for (const auto& u : users) {
+                    DetectedSave det = detected;
+                    SwitchUserId uid = u.id;
+                    addClickableDetail(
+                        picker.content,
+                        u.nickname.empty() ? "User" : u.nickname,
+                        "Open PC for this profile",
+                        [det, uid](brls::View*) {
+                            return openSwitchDetected(det, uid);
+                        });
+                }
+                addClickableDetail(
+                    picker.content, "Use title override",
+                    "No explicit user id", [detected](brls::View*) {
+                        return openSwitchDetected(detected, {});
+                    });
+                brls::Application::pushActivity(new brls::Activity(
+                    makeAppletFrame("Choose user — " + detected.displayName,
+                                    picker.scroll)));
+                return true;
+            }));
     }
     return list.scroll;
 }
@@ -140,9 +145,18 @@ static bool openDetectedRawSave(const DetectedSave& detected) {
         brls::Application::notify(st.message);
         return true;
     }
+    const std::string title =
+        detected.game != GameId::Unknown ? detected.displayName : detected.displayName;
     brls::Application::pushActivity(new brls::Activity(
-        ui::buildSaveWorkspace(ctx.session().backend(), detected.displayName)));
+        ui::buildSaveWorkspace(ctx.session().backend(), title)));
     return true;
+}
+
+static std::string rawSaveStatus(const DetectedSave& d) {
+    if (!d.formatHint.empty()) {
+        return d.formatSupported ? (d.formatHint + " · Open PC") : (d.formatHint + " · soon");
+    }
+    return d.formatSupported ? "Open PC" : "Unsupported";
 }
 
 static brls::View* buildEmuTab() {
@@ -151,7 +165,7 @@ static brls::View* buildEmuTab() {
     list.content->addView(makeSectionHeader("Browse"));
 
     addClickableDetail(
-        list.content, "Scan RetroArch saves", "GBA → DS · common SD paths",
+        list.content, "Scan RetroArch saves", "Auto-detect game from content + name",
         [](brls::View*) {
             auto found = scanRetroArchSaves();
             if (found.empty()) {
@@ -160,21 +174,20 @@ static brls::View* buildEmuTab() {
             }
             auto results = makeScrollList();
             results.content->addView(makeBrandBanner(
-                std::to_string(found.size()) + " save(s) found"));
+                std::to_string(found.size()) + " save(s) recognized"));
             results.content->addView(makeSectionHeader("Detected"));
             for (const auto& d : found) {
                 DetectedSave detected = d;
-                addClickableDetail(
-                    results.content, d.displayName,
-                    d.formatHint + (d.formatSupported ? "" : " · unsupported"),
-                    [detected](brls::View*) { return openDetectedRawSave(detected); });
+                results.content->addView(makeGameOpenRow(
+                    d.displayName, rawSaveStatus(d),
+                    [detected](brls::View*) { return openDetectedRawSave(detected); }));
             }
             brls::Application::pushActivity(new brls::Activity(makeAppletFrame(
                 "Detected saves", results.scroll)));
             return true;
         });
 
-    addClickableDetail(list.content, "Browse files…", "Manual .sav / .dsv / .srm",
+    addClickableDetail(list.content, "Browse files…", "Manual .sav / .dsv / .srm / main",
                        [](brls::View*) {
                            brls::Application::pushActivity(new brls::Activity(
                                ui::buildFileBrowser("sdmc:/retroarch/saves",
@@ -217,6 +230,7 @@ static brls::View* buildAboutView() {
 
     list.content->addView(makeSectionHeader("This beta includes"));
     addBodyLabel(list.content, "Sword / Shield / Scarlet / Violet — SwishCrypto edit + write-back");
+    addBodyLabel(list.content, "Smart save probe — Gen 3 magic, path hints, Swish dumps");
     addBodyLabel(list.content, "National Dex sprites + English names (#1–1025, shiny)");
     addBodyLabel(list.content, "GBA Gen 3 + RetroArch save scan");
     addBodyLabel(list.content, "Hub Storage — cross-gen boxes on SD");
@@ -231,13 +245,13 @@ static brls::View* buildHubTab() {
     auto list = makeScrollList();
     list.content->addView(makeBrandBanner("Your multi-gen boxes"));
     list.content->addView(makeSectionHeader("Storage"));
-    addClickableDetail(list.content, "Open Hub Storage", "Persistent boxes on SD",
-                       [](brls::View*) {
-                           auto& ctx = AppContext::instance();
-                           brls::Application::pushActivity(new brls::Activity(
-                               ui::buildSaveWorkspace(&ctx.hub(), "Hub Storage")));
-                           return true;
-                       });
+    list.content->addView(makeGameOpenRow(
+        "Hub Storage", "Open PC · persistent boxes on SD", [](brls::View*) {
+            auto& ctx = AppContext::instance();
+            brls::Application::pushActivity(new brls::Activity(
+                ui::buildSaveWorkspace(&ctx.hub(), "Hub Storage")));
+            return true;
+        }));
     addClickableDetail(list.content, "About this beta",
                        std::string(kAppVersion) + " · what's included",
                        [](brls::View*) {
@@ -284,7 +298,7 @@ int runHeadlessSmoke() {
     auto detected = pkhub::scanKnownSwitchTitles();
     std::printf("Switch titles: %zu\n", detected.size());
     for (const auto& d : detected) {
-        std::printf("  - %s%s\n", d.displayName.c_str(),
+        std::printf("  - %s [%s]%s\n", d.displayName.c_str(), d.formatHint.c_str(),
                     d.formatSupported ? "" : " [stub]");
     }
 

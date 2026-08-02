@@ -1,5 +1,6 @@
 #include "pkhub/backends/RawSaveBackend.hpp"
 
+#include "pkhub/backends/SaveProbe.hpp"
 #include "pkhub/backends/raw/GbaGen3.hpp"
 #include "pkhub/core/fs/Paths.hpp"
 
@@ -12,22 +13,7 @@ namespace pkhub {
 RawSaveBackend::RawSaveBackend(std::string path) : path_(std::move(path)) {}
 
 RawSaveFormat detectRawFormat(const std::string& path, const std::vector<uint8_t>& data) {
-    const auto dot = path.find_last_of('.');
-    if (dot == std::string::npos) {
-        return RawSaveFormat::Unknown;
-    }
-    const auto ext = path.substr(dot + 1);
-    if (ext == "sav" || ext == "srm") {
-        // GBA: 128KB, optionally with RTC footer (0x20000+).
-        if (data.size() >= 0x20000 && data.size() <= 0x20000 + 0x100) {
-            return RawSaveFormat::GbaSav;
-        }
-        return RawSaveFormat::NdsSav;
-    }
-    if (ext == "dsv") {
-        return RawSaveFormat::NdsDsv;
-    }
-    return RawSaveFormat::Unknown;
+    return probeSaveBytes(path, data).format;
 }
 
 SaveOpenStatus RawSaveBackend::open() {
@@ -37,9 +23,12 @@ SaveOpenStatus RawSaveBackend::open() {
         return {SaveOpenResult::NotFound, "Cannot open " + resolved};
     }
     raw_.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-    format_ = detectRawFormat(path_, raw_);
+    const SaveProbeResult probe = probeSaveBytes(path_, raw_);
+    format_ = probe.format;
     if (format_ == RawSaveFormat::Unknown) {
-        return {SaveOpenResult::Unsupported, "Unrecognized save format"};
+        return {SaveOpenResult::Unsupported,
+                probe.unsupportedReason.empty() ? "Unrecognized save format"
+                                                : probe.unsupportedReason};
     }
 
     if (format_ == RawSaveFormat::GbaSav) {
@@ -62,7 +51,7 @@ SaveOpenStatus RawSaveBackend::open() {
         boxes_[i].setName("Box " + std::to_string(i + 1));
     }
     party_ = Party{};
-    game_ = GameId::Unknown;
+    game_ = probe.game;
     open_ = true;
     dirty_ = false;
     return {SaveOpenResult::Ok, "RawSaveBackend open (parser pending for this format)"};
@@ -105,7 +94,6 @@ SaveOpenStatus RawSaveBackend::commit() {
         dirty_ = false;
         return {SaveOpenResult::Ok, "GBA save written"};
     }
-    // TODO(phase1): write raw_ back to path_ for other formats
     dirty_ = false;
     return {SaveOpenResult::Ok, "RawSaveBackend commit stub"};
 }

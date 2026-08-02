@@ -7,8 +7,11 @@
 #include "pkhub/core/safety/LegalityService.hpp"
 #include "pkhub/core/safety/SafetyPolicy.hpp"
 #include "pkhub/ui/SpriteService.hpp"
+#include "pkhub/ui/ThemeTokens.hpp"
+#include "pkhub/ui/TypeColors.hpp"
 #include "pkhub/ui/UiList.hpp"
 #include "pkhub/ui/views/BoxGridView.hpp"
+#include "pkhub/ui/views/PokemonSlotView.hpp"
 
 #if defined(PKHUB_HAS_BOREALIS)
 #include <borealis/views/cells/cell_bool.hpp>
@@ -22,87 +25,166 @@ namespace pkhub::ui {
 namespace {
 
 void spaceToolbarButton(brls::View* btn) {
-    btn->setMarginRight(10);
+    btn->setMarginRight(8);
 }
 
-brls::Box* makePartyRow(const Pokemon& mon, std::size_t index) {
+brls::Box* makePartyStrip(IBoxProvider* provider) {
+    auto* strip = new brls::Box(brls::Axis::COLUMN);
+    strip->setPadding(10, 8, 8, 8);
+    strip->setMarginTop(10);
+    strip->setCornerRadius(14);
+    strip->setBackgroundColor(theme::partyStrip());
+    strip->setBorderThickness(1.0f);
+    strip->setBorderColor(theme::accentDim());
+
+    auto* label = new brls::Label();
+    label->setFontSize(14);
+    label->setTextColor(theme::textMuted());
+    label->setText("Party");
+    strip->addView(label);
+
     auto* row = new brls::Box(brls::Axis::ROW);
-    row->setAlignItems(brls::AlignItems::CENTER);
-    row->setPadding(10, 8, 10, 8);
-    row->setCornerRadius(10);
-    row->setBackgroundColor(nvgRGBA(18, 28, 34, 210));
-    row->setBorderThickness(1.0f);
-    row->setBorderColor(mon.empty() ? nvgRGBA(70, 90, 85, 50)
-                                    : (mon.isShiny ? nvgRGBA(230, 190, 70, 140)
-                                                   : nvgRGBA(90, 160, 135, 90)));
-    row->setMarginBottom(8);
+    row->setPaddingTop(6);
+    row->setJustifyContent(brls::JustifyContent::FLEX_START);
+    strip->addView(row);
+
+    if (!provider) {
+        return strip;
+    }
+    for (std::size_t i = 0; i < provider->party().size(); ++i) {
+        auto* slot = new PokemonSlotView();
+        slot->setWidth(78);
+        slot->setHeight(92);
+        slot->setPokemon(&provider->party().slot(i));
+        const std::size_t idx = i;
+        slot->registerClickAction([provider, idx](brls::View*) {
+            brls::Application::pushActivity(
+                new brls::Activity(buildEditor(provider, true, 0, idx)));
+            return true;
+        });
+        row->addView(slot);
+    }
+    return strip;
+}
+
+brls::Box* makeSummaryHero(const Pokemon& mon) {
+    auto* hero = new brls::Box(brls::Axis::ROW);
+    hero->setAlignItems(brls::AlignItems::CENTER);
+    hero->setPadding(14, 10, 18, 10);
+    hero->setMarginBottom(10);
+    hero->setCornerRadius(16);
+    hero->setBackgroundColor(theme::bgWallpaper());
+    hero->setBorderThickness(1.2f);
+    hero->setBorderColor(mon.isShiny ? nvgRGBA(230, 190, 70, 160) : theme::accentDim());
+
+    auto* spriteFrame = new brls::Box(brls::Axis::COLUMN);
+    spriteFrame->setWidth(108);
+    spriteFrame->setHeight(108);
+    spriteFrame->setCornerRadius(54);
+    spriteFrame->setBackgroundColor(nvgRGBA(20, 40, 44, 230));
+    spriteFrame->setJustifyContent(brls::JustifyContent::CENTER);
+    spriteFrame->setAlignItems(brls::AlignItems::CENTER);
 
     auto* sprite = new brls::Image();
-    sprite->setWidth(48);
-    sprite->setHeight(48);
+    sprite->setWidth(92);
+    sprite->setHeight(92);
     sprite->setScalingType(brls::ImageScalingType::FIT);
-    sprite->setCornerRadius(8);
-    if (!mon.empty()) {
-        const auto path = SpriteService::spritePath(mon);
-        if (!path.empty()) {
-            sprite->setImageFromRes(path);
-        }
+    const auto path = SpriteService::spritePath(mon);
+    if (!path.empty()) {
+        sprite->setImageFromRes(path);
     }
-    row->addView(sprite);
+    spriteFrame->addView(sprite);
+    hero->addView(spriteFrame);
 
-    auto* col = new brls::Box(brls::Axis::COLUMN);
-    col->setPaddingLeft(14);
-    col->setGrow(1.f);
+    auto* meta = new brls::Box(brls::Axis::COLUMN);
+    meta->setPaddingLeft(18);
+    meta->setGrow(1.f);
 
-    auto* title = new brls::Label();
-    title->setFontSize(18);
-    title->setTextColor(nvgRGB(230, 242, 236));
-    if (mon.empty()) {
-        title->setText("Slot " + std::to_string(index + 1));
-    } else {
-        title->setText(pokemonDisplayName(mon) + (mon.isShiny ? "  ✦" : ""));
-    }
-    col->addView(title);
+    auto* name = new brls::Label();
+    name->setFontSize(28);
+    name->setTextColor(theme::text());
+    name->setText(pokemonDisplayName(mon) + (mon.isShiny ? "  ✦" : ""));
+    meta->addView(name);
 
     auto* sub = new brls::Label();
-    sub->setFontSize(13);
-    sub->setTextColor(nvgRGBA(130, 180, 160, 220));
-    if (mon.empty()) {
-        sub->setText("Empty");
-    } else {
-        sub->setText("Lv " + std::to_string(mon.level) + "  ·  #" +
-                     std::to_string(nationalDexId(mon)));
+    sub->setFontSize(16);
+    sub->setTextColor(theme::textMuted());
+    {
+        const uint16_t nat = nationalDexId(mon);
+        std::string line = "Lv " + std::to_string(mon.level) + "  ·  #" + std::to_string(nat);
+        const char* speciesName = speciesEnglishName(nat);
+        if (speciesName && *speciesName) {
+            line += "  ";
+            line += speciesName;
+        }
+        sub->setText(line);
     }
-    col->addView(sub);
-    row->addView(col);
-    return row;
+    meta->addView(sub);
+
+    const char* nature = natureEnglishName(mon.nature);
+    if (nature && *nature) {
+        auto* natLine = new brls::Label();
+        natLine->setFontSize(14);
+        natLine->setTextColor(theme::textFaint());
+        natLine->setText(std::string("Nature  ") + nature);
+        meta->addView(natLine);
+    }
+
+    if (mon.teraType != PokemonType::None) {
+        auto* pill = new brls::Box(brls::Axis::ROW);
+        pill->setMarginTop(8);
+        pill->setPadding(4, 10, 4, 10);
+        pill->setCornerRadius(8);
+        pill->setBackgroundColor(pokemonTypeColor(mon.teraType));
+        auto* t = new brls::Label();
+        t->setFontSize(13);
+        t->setTextColor(nvgRGB(20, 24, 22));
+        t->setText(std::string("Tera ") + pokemonTypeEnglishName(mon.teraType));
+        pill->addView(t);
+        meta->addView(pill);
+    } else if (mon.nativeGeneration == Generation::Gen9) {
+        auto* sv = new brls::Label();
+        sv->setFontSize(13);
+        sv->setTextColor(theme::textFaint());
+        sv->setText("SV internal id " + std::to_string(mon.species));
+        meta->addView(sv);
+    }
+
+    hero->addView(meta);
+    return hero;
 }
 
 }  // namespace
 
 brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title) {
     auto* body = new brls::Box(brls::Axis::COLUMN);
-    body->setPadding(16);
+    body->setPadding(12, 14, 12, 14);
     body->setGrow(1.f);
-    body->setBackgroundColor(nvgRGB(10, 16, 20));
+    body->setBackgroundColor(theme::bg());
 
     auto* toolbar = new brls::Box(brls::Axis::ROW);
-    toolbar->setPaddingBottom(14);
+    toolbar->setPaddingBottom(10);
     toolbar->setAlignItems(brls::AlignItems::CENTER);
+
     auto* prev = new brls::Button();
-    prev->setText("◀ Box");
+    prev->setText("◀");
     auto* next = new brls::Button();
-    next->setText("Box ▶");
-    auto* partyBtn = new brls::Button();
-    partyBtn->setText("Party");
+    next->setText("▶");
     auto* saveBtn = new brls::Button();
     saveBtn->setText("Save");
     spaceToolbarButton(prev);
     spaceToolbarButton(next);
-    spaceToolbarButton(partyBtn);
+
+    auto* boxLabel = new brls::Label();
+    boxLabel->setFontSize(16);
+    boxLabel->setTextColor(theme::textMuted());
+    boxLabel->setText("PC Boxes");
+    boxLabel->setMarginRight(12);
+    boxLabel->setGrow(1.f);
+
     toolbar->addView(prev);
     toolbar->addView(next);
-    toolbar->addView(partyBtn);
+    toolbar->addView(boxLabel);
     toolbar->addView(saveBtn);
     body->addView(toolbar);
 
@@ -115,6 +197,7 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
         };
     }
     body->addView(grid);
+    body->addView(makePartyStrip(provider));
 
     prev->registerClickAction([provider, grid](brls::View*) {
         if (!provider || provider->boxCount() == 0) {
@@ -132,26 +215,6 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
         grid->setBoxIndex(i);
         return true;
     });
-    partyBtn->registerClickAction([provider](brls::View*) {
-        if (!provider) {
-            return true;
-        }
-        auto list = makeScrollList();
-        list.content->addView(makeSectionHeader("Party", "Tap a slot to edit"));
-        for (std::size_t i = 0; i < provider->party().size(); ++i) {
-            const auto& mon = provider->party().slot(i);
-            auto* row = makePartyRow(mon, i);
-            row->registerClickAction([provider, i](brls::View*) {
-                brls::Application::pushActivity(
-                    new brls::Activity(buildEditor(provider, true, 0, i)));
-                return true;
-            });
-            list.content->addView(row);
-        }
-        brls::Application::pushActivity(
-            new brls::Activity(makeAppletFrame("Party", list.scroll)));
-        return true;
-    });
     saveBtn->registerClickAction([](brls::View*) {
         auto& ctx = AppContext::instance();
         SafetyPolicy policy;
@@ -163,7 +226,9 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
         return true;
     });
 
-    return makeAppletFrame(title.empty() ? "Save Workspace" : title, body);
+    const std::string frameTitle =
+        title.empty() ? "PC Boxes" : (title + " · PC");
+    return makeAppletFrame(frameTitle, body);
 }
 
 brls::View* buildEditor(IBoxProvider* provider,
@@ -186,72 +251,10 @@ brls::View* buildEditor(IBoxProvider* provider,
 
     auto list = makeScrollList();
     if (!mon || mon->empty()) {
-        list.content->addView(makeSectionHeader("Empty slot"));
+        list.content->addView(makeSectionHeader("Empty slot", "Nothing stored here yet"));
         addBodyLabel(list.content, "Create / import tools are coming next.");
     } else {
-        auto* hero = new brls::Box(brls::Axis::ROW);
-        hero->setAlignItems(brls::AlignItems::CENTER);
-        hero->setPadding(10, 8, 18, 8);
-        hero->setCornerRadius(14);
-        hero->setBackgroundColor(nvgRGBA(18, 28, 34, 230));
-        hero->setBorderThickness(1.0f);
-        hero->setBorderColor(mon->isShiny ? nvgRGBA(230, 190, 70, 150)
-                                          : nvgRGBA(78, 176, 148, 90));
-        hero->setMarginBottom(8);
-
-        auto* spriteFrame = new brls::Box(brls::Axis::COLUMN);
-        spriteFrame->setWidth(84);
-        spriteFrame->setHeight(84);
-        spriteFrame->setCornerRadius(12);
-        spriteFrame->setBackgroundColor(nvgRGB(24, 36, 44));
-        spriteFrame->setJustifyContent(brls::JustifyContent::CENTER);
-        spriteFrame->setAlignItems(brls::AlignItems::CENTER);
-
-        auto* sprite = new brls::Image();
-        sprite->setWidth(72);
-        sprite->setHeight(72);
-        sprite->setScalingType(brls::ImageScalingType::FIT);
-        const auto path = SpriteService::spritePath(*mon);
-        if (!path.empty()) {
-            sprite->setImageFromRes(path);
-        }
-        spriteFrame->addView(sprite);
-        hero->addView(spriteFrame);
-
-        auto* meta = new brls::Box(brls::Axis::COLUMN);
-        meta->setPaddingLeft(16);
-        auto* name = new brls::Label();
-        name->setFontSize(26);
-        name->setTextColor(nvgRGB(235, 248, 242));
-        name->setText(pokemonDisplayName(*mon) + (mon->isShiny ? "  ✦" : ""));
-        meta->addView(name);
-
-        auto* sub = new brls::Label();
-        sub->setFontSize(15);
-        sub->setTextColor(nvgRGBA(130, 185, 165, 235));
-        {
-            const uint16_t nat = nationalDexId(*mon);
-            std::string line = "Lv " + std::to_string(mon->level) + "  ·  #" +
-                               std::to_string(nat);
-            const char* speciesName = speciesEnglishName(nat);
-            if (speciesName && *speciesName) {
-                line += " ";
-                line += speciesName;
-            }
-            sub->setText(line);
-        }
-        meta->addView(sub);
-
-        if (mon->nativeGeneration == Generation::Gen9) {
-            auto* sv = new brls::Label();
-            sv->setFontSize(13);
-            sv->setTextColor(nvgRGBA(110, 150, 135, 200));
-            sv->setText("SV internal id " + std::to_string(mon->species));
-            meta->addView(sv);
-        }
-        hero->addView(meta);
-        list.content->addView(hero);
-
+        list.content->addView(makeSummaryHero(*mon));
         list.content->addView(makeSectionHeader("Edit"));
 
         auto* shiny = new brls::BooleanCell();
@@ -343,7 +346,7 @@ brls::View* buildEditor(IBoxProvider* provider,
 
         if (mon->nativeGeneration == Generation::Gen9 || mon->teraType != PokemonType::None) {
             list.content->addView(makeSectionHeader("Scarlet / Violet"));
-            auto* tera = makeDetailCell("Tera type", std::to_string(int(mon->teraType)));
+            auto* tera = makeDetailCell("Tera type", pokemonTypeEnglishName(mon->teraType));
             tera->registerClickAction([mon, tera](brls::View*) {
                 int t = int(mon->teraType);
                 if (t < 0 || t > 18) {
@@ -352,7 +355,7 @@ brls::View* buildEditor(IBoxProvider* provider,
                     t = (t + 1) % 19;
                 }
                 mon->teraType = static_cast<PokemonType>(t);
-                tera->setDetailText(std::to_string(int(mon->teraType)));
+                tera->setDetailText(pokemonTypeEnglishName(mon->teraType));
                 return true;
             });
             list.content->addView(tera);
@@ -367,7 +370,7 @@ brls::View* buildEditor(IBoxProvider* provider,
         }
     }
 
-    return makeAppletFrame("Editor", list.scroll);
+    return makeAppletFrame("Summary", list.scroll);
 }
 
 #endif

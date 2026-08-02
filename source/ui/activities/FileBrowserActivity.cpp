@@ -3,6 +3,7 @@
 #include "pkhub/core/fs/FileBrowser.hpp"
 #include "pkhub/ui/UiList.hpp"
 
+#include <cctype>
 #include <memory>
 
 namespace pkhub::ui {
@@ -54,12 +55,19 @@ brls::View* buildFileBrowser(const std::string& startPath,
                 continue;
             }
             const std::string ext = fs::fileExtension(ent.name);
-            if (ext != "sav" && ext != "srm" && ext != "dsv") {
+            std::string nameLower = ent.name;
+            for (char& c : nameLower) {
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            }
+            const bool saveLike = (ext == "sav" || ext == "srm" || ext == "dsv" ||
+                                   ext == "bin" || nameLower == "main");
+            if (!saveLike) {
                 continue;
             }
             const std::string filePath = ent.path;
-            addClickableDetail(content, ent.name,
-                               ext + " · " + std::to_string(ent.size) + " B",
+            const std::string detail =
+                (ext.empty() ? nameLower : ext) + " · " + std::to_string(ent.size) + " B";
+            addClickableDetail(content, ent.name, detail,
                                [filePath, onFileChosen](brls::View*) {
                                    if (onFileChosen) {
                                        onFileChosen(filePath);

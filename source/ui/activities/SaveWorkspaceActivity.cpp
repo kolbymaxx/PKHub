@@ -23,14 +23,15 @@ brls::View* buildSaveWorkspace(IBoxProvider* provider, const std::string& title)
     auto* body = new brls::Box(brls::Axis::COLUMN);
     body->setPadding(16);
     body->setGrow(1.f);
-    body->setBackgroundColor(nvgRGB(14, 20, 24));
+    body->setBackgroundColor(nvgRGB(10, 16, 20));
 
     auto* toolbar = new brls::Box(brls::Axis::ROW);
-    toolbar->setPaddingBottom(10);
+    toolbar->setPaddingBottom(12);
+    toolbar->setAlignItems(brls::AlignItems::CENTER);
     auto* prev = new brls::Button();
-    prev->setText("Prev");
+    prev->setText("◀ Box");
     auto* next = new brls::Button();
-    next->setText("Next");
+    next->setText("Box ▶");
     auto* partyBtn = new brls::Button();
     partyBtn->setText("Party");
     auto* saveBtn = new brls::Button();

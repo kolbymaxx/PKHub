@@ -39,6 +39,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PKHUB_AUTHOR "PKHub Contributors")
 set(PKHUB_TITLEID "010000000000F1B0")
+# NACP / hbmenu display version (keep in sync with include/pkhub/app/Version.hpp).
+set(PKHUB_VERSION_LABEL "0.1.0-beta")
+set(PKHUB_ICON "${CMAKE_SOURCE_DIR}/resources/img/icons/pkhub.jpg")
 
 set(PKHUB_SOURCES
     source/main.cpp
@@ -166,8 +169,9 @@ if(PLATFORM_SWITCH)
                         "NX_NACPTOOL=${NX_NACPTOOL}"
                         "NX_ELF2NRO=${NX_ELF2NRO}"
                         "PKHUB_AUTHOR=${PKHUB_AUTHOR}"
-                        "PKHUB_VERSION=${PROJECT_VERSION}"
+                        "PKHUB_VERSION=${PKHUB_VERSION_LABEL}"
                         "PKHUB_TITLEID=${PKHUB_TITLEID}"
+                        "PKHUB_ICON=${PKHUB_ICON}"
                         "PKHUB_RESOURCES=${CMAKE_SOURCE_DIR}/resources"
                         "BOREALIS_RESOURCES=${BOREALIS_PATH}/resources"
                         "OUT_DIR=$<TARGET_FILE_DIR:PKHub>"

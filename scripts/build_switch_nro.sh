@@ -47,7 +47,7 @@ docker run --rm \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/Switch.cmake
     cmake --build build/switch -j"$(nproc)"
-    ls -lh build/switch/PKHub.nro build/switch/PKHub
+    ls -lh build/switch/PKHub.nro build/switch/PKHub.elf
   '
 
 mkdir -p /opt/cursor/artifacts

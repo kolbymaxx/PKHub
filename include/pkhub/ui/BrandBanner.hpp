@@ -10,40 +10,40 @@ namespace pkhub::ui {
 /// Compact brand strip for tab tops — product name first, one short line.
 inline brls::Box* makeBrandBanner(const std::string& subtitle) {
     auto* wrap = new brls::Box(brls::Axis::COLUMN);
-    wrap->setPadding(8, 4, 18, 4);
+    wrap->setPadding(4, 2, 14, 2);
 
     auto* row = new brls::Box(brls::Axis::ROW);
     row->setAlignItems(brls::AlignItems::CENTER);
 
     auto* icon = new brls::Image();
-    icon->setWidth(48);
-    icon->setHeight(48);
-    icon->setCornerRadius(12);
+    icon->setWidth(56);
+    icon->setHeight(56);
+    icon->setCornerRadius(14);
     icon->setScalingType(brls::ImageScalingType::FIT);
     icon->setImageFromRes("img/icons/pkhub.png");
     row->addView(icon);
 
     auto* textCol = new brls::Box(brls::Axis::COLUMN);
-    textCol->setPaddingLeft(14);
+    textCol->setPaddingLeft(16);
 
     auto* brand = new brls::Label();
-    brand->setFontSize(28);
+    brand->setFontSize(32);
     brand->setTextColor(nvgRGB(235, 248, 242));
     brand->setText("PKHub");
     textCol->addView(brand);
 
     auto* sub = new brls::Label();
-    sub->setFontSize(14);
-    sub->setTextColor(nvgRGBA(130, 185, 165, 230));
+    sub->setFontSize(15);
+    sub->setTextColor(nvgRGBA(120, 190, 165, 235));
     sub->setText(subtitle);
     textCol->addView(sub);
 
     row->addView(textCol);
     wrap->addView(row);
 
-    auto* rule = new brls::Rectangle(nvgRGBA(72, 168, 140, 70));
+    auto* rule = new brls::Rectangle(nvgRGBA(78, 176, 148, 90));
     rule->setHeight(2);
-    rule->setMarginTop(14);
+    rule->setMarginTop(12);
     wrap->addView(rule);
     return wrap;
 }

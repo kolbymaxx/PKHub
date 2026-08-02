@@ -64,7 +64,7 @@ Or via Docker (recommended in CI / cloud agents):
 
 RomFS includes National Dex sprites (`resources/img/pokemon/` + shiny), app icon, and Borealis assets.
 
-**First beta download:** [`dist/PKHub.nro`](dist/PKHub.nro) (`0.1.0-beta`).
+**Beta download:** [`dist/PKHub.nro`](dist/PKHub.nro). Version is `0.1.0-beta.N` (build `N` increments on every `./scripts/build_switch_nro.sh`).
 
 Prefer **title override** when editing official saves; `fsOpen_SaveData` + user picker is supported for SwSh/SV.
 

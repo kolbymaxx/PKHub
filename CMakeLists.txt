@@ -31,7 +31,10 @@ if(HAVE_BOREALIS AND PLATFORM_DESKTOP AND NOT PLATFORM_SWITCH)
     include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
 endif()
 
-project(PKHub VERSION 0.1.0 LANGUAGES C CXX)
+include("${CMAKE_SOURCE_DIR}/cmake/PkhubVersion.cmake")
+
+project(PKHub VERSION ${PKHUB_VERSION_MAJOR}.${PKHUB_VERSION_MINOR}.${PKHUB_VERSION_PATCH}
+        LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,9 +42,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PKHUB_AUTHOR "PKHub Contributors")
 set(PKHUB_TITLEID "010000000000F1B0")
-# NACP / hbmenu display version (keep in sync with include/pkhub/app/Version.hpp).
-set(PKHUB_VERSION_LABEL "0.1.0-beta")
 set(PKHUB_ICON "${CMAKE_SOURCE_DIR}/resources/img/icons/pkhub.jpg")
+
+# Keep include/pkhub/app/Version.hpp in sync with cmake/PkhubVersion.cmake.
+configure_file(
+    "${CMAKE_SOURCE_DIR}/include/pkhub/app/Version.hpp.in"
+    "${CMAKE_SOURCE_DIR}/include/pkhub/app/Version.hpp"
+    @ONLY
+)
+message(STATUS "PKHub version label: ${PKHUB_VERSION_LABEL}")
 
 set(PKHUB_SOURCES
     source/main.cpp

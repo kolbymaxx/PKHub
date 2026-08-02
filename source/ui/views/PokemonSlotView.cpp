@@ -11,45 +11,47 @@ PokemonSlotView::PokemonSlotView() {
     setAxis(brls::Axis::COLUMN);
     setJustifyContent(brls::JustifyContent::CENTER);
     setAlignItems(brls::AlignItems::CENTER);
-    setWidth(78);
-    setHeight(96);
-    setCornerRadius(10);
-    setBackgroundColor(nvgRGBA(18, 24, 32, 210));
-    setBorderThickness(1.0f);
-    setBorderColor(nvgRGBA(120, 160, 140, 70));
+    setWidth(86);
+    setHeight(104);
+    setCornerRadius(12);
+    setBackgroundColor(nvgRGBA(16, 24, 30, 220));
+    setBorderThickness(1.2f);
+    setBorderColor(nvgRGBA(90, 140, 120, 80));
+    setMarginRight(6);
+    setMarginBottom(4);
 
     frame_ = new brls::Box(brls::Axis::COLUMN);
     frame_->setJustifyContent(brls::JustifyContent::CENTER);
     frame_->setAlignItems(brls::AlignItems::CENTER);
-    frame_->setWidth(64);
-    frame_->setHeight(64);
-    frame_->setCornerRadius(8);
-    frame_->setBackgroundColor(nvgRGBA(28, 38, 48, 255));
+    frame_->setWidth(68);
+    frame_->setHeight(68);
+    frame_->setCornerRadius(10);
+    frame_->setBackgroundColor(nvgRGB(24, 34, 42));
     addView(frame_);
 
     image_ = new brls::Image();
-    image_->setWidth(56);
-    image_->setHeight(56);
+    image_->setWidth(58);
+    image_->setHeight(58);
     image_->setScalingType(brls::ImageScalingType::FIT);
     image_->setVisibility(brls::Visibility::GONE);
     frame_->addView(image_);
 
-    fallback_ = new brls::Rectangle(nvgRGB(48, 58, 68));
-    fallback_->setWidth(52);
-    fallback_->setHeight(52);
-    fallback_->setCornerRadius(6);
+    fallback_ = new brls::Rectangle(nvgRGB(42, 52, 60));
+    fallback_->setWidth(48);
+    fallback_->setHeight(48);
+    fallback_->setCornerRadius(8);
     frame_->addView(fallback_);
 
     shinyBadge_ = new brls::Label();
-    shinyBadge_->setFontSize(12);
+    shinyBadge_->setFontSize(13);
     shinyBadge_->setText("✦");
-    shinyBadge_->setTextColor(nvgRGB(240, 200, 80));
+    shinyBadge_->setTextColor(nvgRGB(245, 210, 90));
     shinyBadge_->setVisibility(brls::Visibility::GONE);
     addView(shinyBadge_);
 
     label_ = new brls::Label();
-    label_->setFontSize(13);
-    label_->setTextColor(nvgRGB(210, 220, 215));
+    label_->setFontSize(12);
+    label_->setTextColor(nvgRGB(200, 220, 210));
     label_->setText("");
     addView(label_);
 }
@@ -66,15 +68,18 @@ void PokemonSlotView::setPokemon(const Pokemon* mon) {
         }
         if (fallback_) {
             fallback_->setVisibility(brls::Visibility::VISIBLE);
-            fallback_->setColor(nvgRGBA(40, 48, 56, 180));
+            fallback_->setColor(nvgRGBA(36, 46, 54, 160));
         }
         if (label_) {
-            label_->setText("");
+            label_->setText("·");
+            label_->setTextColor(nvgRGBA(100, 130, 118, 180));
         }
         if (shinyBadge_) {
             shinyBadge_->setVisibility(brls::Visibility::GONE);
         }
-        setBorderColor(nvgRGBA(80, 100, 95, 40));
+        setBackgroundColor(nvgRGBA(14, 20, 26, 160));
+        setBorderColor(nvgRGBA(70, 95, 88, 55));
+        setBorderThickness(1.0f);
         return;
     }
 
@@ -82,7 +87,6 @@ void PokemonSlotView::setPokemon(const Pokemon* mon) {
     bool loaded = false;
     if (image_ && !path.empty()) {
         image_->setImageFromRes(path);
-        // NanoVG returns 0 texture on failure; borealis keeps prior texture — still show image view.
         image_->setVisibility(brls::Visibility::VISIBLE);
         if (fallback_) {
             fallback_->setVisibility(brls::Visibility::GONE);
@@ -101,18 +105,21 @@ void PokemonSlotView::setPokemon(const Pokemon* mon) {
     }
 
     if (label_) {
+        label_->setTextColor(nvgRGB(210, 228, 218));
         label_->setText(SpriteService::displayLabel(*mon));
     }
     if (shinyBadge_) {
         shinyBadge_->setVisibility(mon->isShiny ? brls::Visibility::VISIBLE
                                                 : brls::Visibility::GONE);
     }
-    setBorderColor(mon->isShiny ? nvgRGBA(230, 190, 70, 160) : nvgRGBA(100, 170, 140, 90));
+    setBackgroundColor(nvgRGBA(18, 28, 34, 235));
+    setBorderColor(mon->isShiny ? nvgRGBA(235, 195, 70, 190) : nvgRGBA(90, 170, 140, 120));
+    setBorderThickness(mon->isShiny ? 2.0f : 1.2f);
 }
 
 void PokemonSlotView::setSelected(bool selected) {
-    setBackgroundColor(selected ? nvgRGBA(36, 70, 62, 240) : nvgRGBA(18, 24, 32, 210));
-    setBorderThickness(selected ? 2.0f : 1.0f);
+    setBackgroundColor(selected ? nvgRGBA(36, 78, 66, 245) : nvgRGBA(16, 24, 30, 220));
+    setBorderThickness(selected ? 2.4f : 1.2f);
 }
 
 #endif

@@ -1,0 +1,10 @@
+#pragma once
+
+namespace pkhub {
+
+constexpr const char* kAppName = "PKHub";
+/// Display / NACP version — generated from cmake/PkhubVersion.cmake.
+constexpr const char* kAppVersion = "@PKHUB_VERSION_LABEL@";
+constexpr int kAppBuildNumber = @PKHUB_BUILD_NUMBER@;
+
+}  // namespace pkhub
